@@ -859,14 +859,15 @@ function sha256(s){const b=[...new TextEncoder().encode(s)],l=b.length*8;b.push(
  return h.map(v=>v.toString(16).padStart(8,'0')).join('')}
 const authH=(pw,salt,h)=>{let x=salt+h+pw;for(let i=0;i<2000;i++)x=sha256(x+salt);return x};
 const AUTH_RES=['ぱろ','パロ','ぱろさぶ','りゅうが','リュウガ'];
-$('#nm').insertAdjacentHTML('afterend','<input id="pw2" type="password" maxlength="32" placeholder="パスワード（4文字以上）" autocomplete="current-password">');
+$('#nm').insertAdjacentHTML('afterend','<input id="pw2" type="password" maxlength="32" placeholder="パスワード（4文字以上／この端末で入ったことがあれば空欄でOK）" autocomplete="current-password">');
 $('#pw2').insertAdjacentHTML('afterend','<label class="sm" style="display:block;margin:4px 0"><input id="rm" type="checkbox" checked style="width:auto;margin:0 6px 0 0;vertical-align:middle">この端末では次回からパスワード入力を省略する</label>');
 $('#login .sm').insertAdjacentHTML('beforeend','<br>初めての名前は、入力したパスワードが設定されます。');
-let AT=null;const rmOn=()=>{const e=$('#rm');return !e||e.checked},rmSave=(n,h)=>{if(rmOn())L.set('tok',{n,h})};
+let AT=null;const rmOn=()=>{const e=$('#rm');return !e||e.checked},rmSave=(n,h)=>{if(rmOn()){L.set('tok',{n,h});const m=L.get('toks')||{};m[n]=h;L.set('toks',m)}};
 async function authOK(n){const h=hex(n),pw=$('#pw2').value;
- if(!AT&&pw.length<4){toast('パスワードを入力してください（4文字以上）');return false}
+ const m0=L.get('toks')||{},useTok=!AT&&!pw&&!!m0[n];
+ if(!AT&&!useTok&&pw.length<4){toast('パスワードを入力してください（4文字以上）');return false}
  let rec;try{const r=await tmo(fetch(U('auth/'+h)),6000);if(!r.ok)throw 0;rec=await r.json()}catch(e){toast('サーバーに接続できません。少し待ってからやり直してください');return false}
- if(AT){const ok=!!(rec&&rec.h&&AT.n===n&&AT.h===rec.h);if(!ok)L.set('tok',null);if(ok)return true;toast('もう一度パスワードを入力してください');return false}
+ if(AT||useTok){const t=AT?AT.h:m0[n],ok=!!(rec&&rec.h&&(!AT||AT.n===n)&&t===rec.h);if(ok){if(useTok)rmSave(n,t);return true}if(AT)L.set('tok',null);else{delete m0[n];L.set('toks',m0)}toast('もう一度パスワードを入力してください');return false}
  if(rec&&rec.h){if(authH(pw,rec.s,h)!==rec.h){await sleep(1200);toast('名前かパスワードが違います');return false}rmSave(n,rec.h);return true}
  if(AUTH_RES.includes(n)){const k=prompt('この名前は管理者用です。確認用パスワード（操作室のパスワード）を入力してください');if(k!=='128686'){toast('確認に失敗しました');return false}}
  if(!confirm(`「${n}」に、いま入力したパスワードを設定します。\n忘れると入れなくなります（管理者がリセットできます）。よろしいですか？`))return false;
@@ -877,5 +878,6 @@ const _lgA=login_;login_=async function(n){if(!await authOK(n))return;$('#pw2').
 $('#adbody').insertAdjacentHTML('beforeend','<hr><b>パスワードのリセット</b><div class="sm">忘れた人の名前を入れると、次に入るとき新しいパスワードを設定できます（ぱろのみ）</div><input id="rsn" placeholder="リセットする名前"><button onclick="authReset()">リセット</button>');
 async function authReset(){if(!me||!OWNER.includes(me.name))return toast('ぱろのみ操作できます');const n=$('#rsn').value.trim();if(!n)return;await set('auth/'+hex(n),null);$('#rsn').value='';toast(n+' のパスワードをリセットしました')}
 const _loA=logout;logout=function(){L.set('tok',null);_loA()};
+$('#login').insertAdjacentHTML('beforeend','<div class="c"><button class="s" style="font-size:11px" onclick="L.set(\'toks\',null);L.set(\'tok\',null);toast(\'この端末の記憶を消しました\')">この端末の記憶を消す</button></div>');
 {const tk=L.get('tok');if(tk&&tk.n&&tk.h){$('#nm').value=tk.n;AT=tk;login(tk.n).then(()=>{AT=null},()=>{AT=null})}}
 </script></body></html>
