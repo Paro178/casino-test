@@ -835,7 +835,7 @@ async function admDel(h){if(!OWNER.includes(me.name))return;const n=PN[h];if(!n)
  const ln=await get('bank/'+h),warn=ln&&ln.st=='active'?'（借入中です）':'';
  if(!confirm(`「${n}」のアカウントを削除します${warn}。\n所持金・履歴・借入・ログインボーナス・宝くじなど、全てのデータが消えて、元に戻せません。よろしいですか？`))return;
  await set('del/'+h,{t:Date.now(),n});
- await Promise.all(['players/'+h,'hist/'+h,'vip/'+h,'bank/'+h,'lb/'+h,'pres/'+h,'live/'+h,'stream/'+h,'lott/'+h,'auth/'+h].map(p=>set(p,null)));
+ await Promise.all(['players/'+h,'hist/'+h,'vip/'+h,'bank/'+h,'lb/'+h,'pres/'+h,'live/'+h,'stream/'+h,'lott/'+h].map(p=>set(p,null)));
  const lots=(await get('lot'))||{};for(const k of Object.keys(lots))if(lots[k]&&lots[k].t&&lots[k].t[h])await set('lot/'+k+'/t/'+h,null);
  const c={...DEF,...((await get('cfg/main'))||{})};if(c.pb)delete c.pb[h];if(c.ban)delete c.ban[h];await set('cfg/main',c);Object.assign(cfg,{pb:c.pb,ban:c.ban});
  toast(`${n} のアカウントを削除しました`);rAdm()}
@@ -846,38 +846,4 @@ setInterval(delSweep,8000);
 
 /* ===== v22: スロット/パチスロ高難易度化＋GM専用の裏コマンド（残高を5回タップ） ===== */
 (()=>{let c=0,t=0;$('#mny').addEventListener('click',()=>{if(!me||!(me.name=='ぱろ'||me.name=='ぱろさぶ'))return;const n=Date.now();c=n-t<1500?c+1:1;t=n;if(c>=5){c=0;ASSIST=!ASSIST;L.set('assist',ASSIST);toast(ASSIST?'アシスト ON':'アシスト OFF')}})})();
-/* ===== v23: プレイヤーごとのパスワード（なりすまし防止）／ GM専用アシスト ===== */
-const S2K=[],S2H=[];(()=>{let n=2,c=0;while(c<64){let p=1;for(let i=2;i*i<=n;i++)if(n%i==0)p=0;if(p){S2K.push(Math.floor((Math.cbrt(n)%1)*2**32));if(c<8)S2H.push(Math.floor((Math.sqrt(n)%1)*2**32));c++}n++}})();
-function sha256(s){const b=[...new TextEncoder().encode(s)],l=b.length*8;b.push(128);while(b.length%64!=56)b.push(0);for(let i=7;i>=0;i--)b.push(i>3?0:(l>>>(i*8))&255);
- const h=S2H.slice(),R2=(x,n)=>(x>>>n)|(x<<(32-n));
- for(let o=0;o<b.length;o+=64){const w=[];for(let i=0;i<16;i++)w[i]=((b[o+i*4]<<24)|(b[o+i*4+1]<<16)|(b[o+i*4+2]<<8)|b[o+i*4+3])>>>0;
-  for(let i=16;i<64;i++){const a=w[i-15],c=w[i-2];w[i]=(w[i-16]+((R2(a,7)^R2(a,18)^(a>>>3))>>>0)+w[i-7]+((R2(c,17)^R2(c,19)^(c>>>10))>>>0))>>>0}
-  let [a,b2,c,d,e,f,g,hh]=h;
-  for(let i=0;i<64;i++){const t1=(hh+((R2(e,6)^R2(e,11)^R2(e,25))>>>0)+(((e&f)^(~e&g))>>>0)+S2K[i]+w[i])>>>0,t2=(((R2(a,2)^R2(a,13)^R2(a,22))>>>0)+(((a&b2)^(a&c)^(b2&c))>>>0))>>>0;
-   hh=g;g=f;f=e;e=(d+t1)>>>0;d=c;c=b2;b2=a;a=(t1+t2)>>>0}
-  [a,b2,c,d,e,f,g,hh].forEach((v,i)=>h[i]=(h[i]+v)>>>0)}
- return h.map(v=>v.toString(16).padStart(8,'0')).join('')}
-const authH=(pw,salt,h)=>{let x=salt+h+pw;for(let i=0;i<2000;i++)x=sha256(x+salt);return x};
-const AUTH_RES=['ぱろ','パロ','ぱろさぶ','りゅうが','リュウガ'];
-$('#nm').insertAdjacentHTML('afterend','<input id="pw2" type="password" maxlength="32" placeholder="パスワード（4文字以上／この端末で入ったことがあれば空欄でOK）" autocomplete="current-password">');
-$('#pw2').insertAdjacentHTML('afterend','<label class="sm" style="display:block;margin:4px 0"><input id="rm" type="checkbox" checked style="width:auto;margin:0 6px 0 0;vertical-align:middle">この端末では次回からパスワード入力を省略する</label>');
-$('#login .sm').insertAdjacentHTML('beforeend','<br>初めての名前は、入力したパスワードが設定されます。');
-let AT=null;const rmOn=()=>{const e=$('#rm');return !e||e.checked},rmSave=(n,h)=>{if(rmOn()){L.set('tok',{n,h});const m=L.get('toks')||{};m[n]=h;L.set('toks',m)}};
-async function authOK(n){const h=hex(n),pw=$('#pw2').value;
- const m0=L.get('toks')||{},useTok=!AT&&!pw&&!!m0[n];
- if(!AT&&!useTok&&pw.length<4){toast('パスワードを入力してください（4文字以上）');return false}
- let rec;try{const r=await tmo(fetch(U('auth/'+h)),6000);if(!r.ok)throw 0;rec=await r.json()}catch(e){toast('サーバーに接続できません。少し待ってからやり直してください');return false}
- if(AT||useTok){const t=AT?AT.h:m0[n],ok=!!(rec&&rec.h&&(!AT||AT.n===n)&&t===rec.h);if(ok){if(useTok)rmSave(n,t);return true}if(AT)L.set('tok',null);else{delete m0[n];L.set('toks',m0)}toast('もう一度パスワードを入力してください');return false}
- if(rec&&rec.h){if(authH(pw,rec.s,h)!==rec.h){await sleep(1200);toast('名前かパスワードが違います');return false}rmSave(n,rec.h);return true}
- if(AUTH_RES.includes(n)){const k=prompt('この名前は管理者用です。確認用パスワード（操作室のパスワード）を入力してください');if(k!=='128686'){toast('確認に失敗しました');return false}}
- if(!confirm(`「${n}」に、いま入力したパスワードを設定します。\n忘れると入れなくなります（管理者がリセットできます）。よろしいですか？`))return false;
- const s=hex(String(Math.random()).slice(2)+Date.now());
- const nh=authH(pw,s,h);try{const r=await tmo(fetch(U('auth/'+h),{method:'PUT',body:JSON.stringify({s,h:nh})}),6000);if(!r.ok)throw 0}catch(e){toast('パスワードの保存に失敗しました。もう一度試してください');return false}
- rmSave(n,nh);toast('パスワードを設定しました');return true}
-const _lgA=login_;login_=async function(n){if(!await authOK(n))return;$('#pw2').value='';await _lgA(n)};
-$('#adbody').insertAdjacentHTML('beforeend','<hr><b>パスワードのリセット</b><div class="sm">忘れた人の名前を入れると、次に入るとき新しいパスワードを設定できます（ぱろのみ）</div><input id="rsn" placeholder="リセットする名前"><button onclick="authReset()">リセット</button>');
-async function authReset(){if(!me||!OWNER.includes(me.name))return toast('ぱろのみ操作できます');const n=$('#rsn').value.trim();if(!n)return;await set('auth/'+hex(n),null);$('#rsn').value='';toast(n+' のパスワードをリセットしました')}
-const _loA=logout;logout=function(){L.set('tok',null);_loA()};
-$('#login').insertAdjacentHTML('beforeend','<div class="c"><button class="s" style="font-size:11px" onclick="L.set(\'toks\',null);L.set(\'tok\',null);toast(\'この端末の記憶を消しました\')">この端末の記憶を消す</button></div>');
-{const tk=L.get('tok');if(tk&&tk.n&&tk.h){$('#nm').value=tk.n;AT=tk;login(tk.n).then(()=>{AT=null},()=>{AT=null})}}
 </script></body></html>
