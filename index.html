@@ -304,7 +304,7 @@ $('h1').textContent='ROYAL CASINO';
 $$('#tabs button').forEach((b,i)=>b.textContent=['スロット','パチスロ','ルーレット','ブラックジャック','ポーカー','ランキング'][i]);
 let chip=100;
 function pick(v){chip=v;sb(v);$$('.ch').forEach(e=>e.classList.toggle('on',+e.dataset.v==v))}
-$('#bet').closest('.box').innerHTML=`<div class="c">${[[100,'#2f5fc4'],[500,'#b3201a'],[1000,'#1f7a46'],[5000,'#1a1a1a'],[10000,'#6a2a9a']].map(([v,c])=>`<div class="ch ${v==100?'on':''}" data-v="${v}" style="--c:${c}" onclick="pick(${v})">${v>=1000?v/1000+'K':v}</div>`).join('')}</div><div class="c sm">BET <input id="bet" type="number" value="100" style="width:110px;text-align:center"> <button class="s" onclick="sb(me.money)">ALL IN</button></div>`;
+$('#bet').closest('.box').innerHTML=`<div class="c">${[[100,'#2f5fc4'],[500,'#b3201a'],[1000,'#1f7a46'],[5000,'#1a1a1a'],[10000,'#6a2a9a']].map(([v,c])=>`<div class="ch ${v==100?'on':''}" data-v="${v}" style="--c:${c}" onclick="pick(${v})">${v>=1000?v/1000+'K':v}</div>`).join('')}</div><div class="c sm">BET <input id="bet" type="number" value="100" style="width:110px;text-align:center"> <button class="s" onclick="allIn()">ALL IN</button></div>`;
 /* ルーレット：本物のベッティングテーブル */
 let RB={};
 const wn=(k,n)=>{const t=k[0],v=+k.slice(1);if(t=='n')return n==v;if(n==0)return false;if(t=='c')return n%3==v%3;if(k=='d1')return n<=12;if(k=='d2')return n>12&&n<25;if(k=='d3')return n>24;return k=='lo'?n<=18:k=='hi'?n>=19:k=='ev'?n%2==0:k=='od'?n%2==1:k=='rd'?RED.has(n):!RED.has(n)};
@@ -315,9 +315,9 @@ for(let n=1;n<=36;n++)tb+=cell('n'+n,n,RED.has(n)?'r':'b',`grid-column:${2+Math.
 [['c3','2:1',1],['c2','2:1',2],['c1','2:1',3]].forEach(([k,t,r])=>tb+=cell(k,t,'o',`grid-column:14;grid-row:${r}`));
 [['d1','1st 12'],['d2','2nd 12'],['d3','3rd 12']].forEach(([k,t],i)=>tb+=cell(k,t,'o',`grid-column:${2+i*4}/span 4;grid-row:4`));
 [['lo','1-18'],['ev','EVEN'],['rd','RED'],['bl','BLACK'],['od','ODD'],['hi','19-36']].forEach(([k,t],i)=>tb+=cell(k,t,k=='rd'?'r':k=='bl'?'b':'o',`grid-column:${2+i*2}/span 2;grid-row:5`));
-$('#roul').innerHTML=`<canvas id="wh" width="260" height="260" style="display:block;margin:4px auto;max-width:100%"></canvas><div class="rn g" id="rnum">0</div><div class="rt">${tb}</div><div class="msg" id="m-roul">チップを選んでテーブルに置き、スピンしてください</div><div class="c"><button onclick="rlSpin()">SPIN</button><button class="s" onclick="RB={};rbDraw()">クリア</button></div>`;
+$('#roul').innerHTML=`<canvas id="wh" width="260" height="260" style="display:block;margin:4px auto;max-width:100%"></canvas><div class="rn g" id="rnum">0</div><div class="rt">${tb}</div><div class="msg" id="m-roul">チップを選んでテーブルに置き、スピンしてください</div><div class="c"><button onclick="rlSpin()">SPIN</button><button class="s" onclick="if(busy)return;RB={};RS=[];rbDraw()">クリア</button></div>`;
 wheel(wrot);
-function rbDraw(){$$('.rc').forEach(e=>{const a=RB[e.dataset.b],o=e.querySelector('.mk');if(o)o.remove();if(a)e.insertAdjacentHTML('beforeend',`<i class="mk">${a>=1000?a/1000+'K':a}</i>`)});$('#m-roul').className='msg';$('#m-roul').textContent=rsum()?`BET 合計 ${rsum().toLocaleString()}C`:'チップを置いてください'}
+function rbDraw(){$$('.rc').forEach(e=>{const a=RB[e.dataset.b],o=e.querySelector('.mk');if(o)o.remove();if(a)e.insertAdjacentHTML('beforeend',`<i class="mk">${fmtK(a)}</i>`)});$('#m-roul').className='msg';$('#m-roul').textContent=rsum()?`BET 合計 ${rsum().toLocaleString()}C`:'チップを置いてください'}
 function rb(k){if(busy)return;if(rsum()+chip>me.money)return toast('所持金が足りません');RB[k]=(RB[k]||0)+chip;tone(800,.04,0,'square',.04);rbDraw()}
 async function rlSpin(){if(busy)return;await sync();const tot=rsum();if(!tot)return toast('チップを置いてください');if(tot>(cfg.maxb||100000))return toast('最高賭け金を超えています');if(tot>me.money)return toast('所持金が足りません');busy=1;cur=tot;await add(-tot);
  const ret=n=>Object.entries(RB).reduce((a,[k,v])=>a+(wn(k,n)?v*(k[0]=='n'?36:'cd'.includes(k[0])?3:2):0),0);
@@ -505,17 +505,17 @@ function rbn(n){let k;const m=RMODE;
  else if(m=='k'){let a=n%3==0?n-1:n;if(a+4>36)a-=3;k='k'+a}
  else k='x'+Math.min(31,3*Math.floor((n-1)/3)+1);
  rb(k)}
-function rb(k){if(busy)return;if(rsum()+chip>me.money)return toast('クレジットが不足しています');if(rsum()+chip>(cfg.maxb||100000))return toast('最高賭け金を超えます');RB[k]=(RB[k]||0)+chip;RS.push([k,chip]);tone(800,.04,0,'square',.04);rbDraw()}
+function rb(k){if(busy)return;let amt=chip;if(RALL){amt=Math.floor(Math.min(me.money,cfg.maxb||100000)-rsum());RALL=false;if(amt<1)return toast('これ以上は置けません（所持金か最高賭け金の上限です）');toast('ALL IN：'+amt.toLocaleString()+'C を置きました')}else{if(rsum()+chip>me.money)return toast('クレジットが不足しています');if(rsum()+chip>(cfg.maxb||100000))return toast('最高賭け金を超えます')}RB[k]=(RB[k]||0)+amt;RS.push([k,amt]);tone(800,.04,0,'square',.04);rbDraw()}
 function rundo(){if(busy)return;const x=RS.pop();if(!x)return;RB[x[0]]-=x[1];if(RB[x[0]]<=0)delete RB[x[0]];rbDraw()}
 function rrebet(){if(busy||!LRB)return;const t=Object.values(LRB).reduce((a,b)=>a+b,0);if(t>me.money)return toast('クレジットが不足しています');RB={...LRB};RS=Object.entries(RB).map(([k,v])=>[k,v]);rbDraw()}
 function rbDraw(){$$('.rc .mk').forEach(e=>e.remove());$$('.rc').forEach(e=>e.classList.toggle('sel',SEL!==null&&e.dataset.b=='n'+SEL));
- Object.entries(RB).forEach(([k,a])=>{const el=$('.rc[data-b="'+('nstkx'.includes(k[0])?'n'+cov(k)[0]:k)+'"]');if(el)el.insertAdjacentHTML('beforeend',`<i class="mk" style="right:${el.querySelectorAll('.mk').length*11}px">${a>=1000?a/1000+'K':a}</i>`)});
+ Object.entries(RB).forEach(([k,a])=>{const el=$('.rc[data-b="'+('nstkx'.includes(k[0])?'n'+cov(k)[0]:k)+'"]');if(el)el.insertAdjacentHTML('beforeend',`<i class="mk" style="right:${el.querySelectorAll('.mk').length*11}px">${fmtK(a)}</i>`)});
  $('#m-roul').className='msg';$('#m-roul').textContent=rsum()?`BET 合計 ${rsum().toLocaleString()}C`:'チップを置いてください'}
 async function rlSpin(){if(busy)return;await sync();const tot=rsum();if(!tot)return toast('チップを置いてください');if(tot<(cfg.minb||10))return toast(`最低賭け金は ${cfg.minb||10}C です`);if(tot>(cfg.maxb||100000))return toast('最高賭け金を超えています');if(tot>me.money)return toast('クレジットが不足しています');
- busy=1;cur=tot;LRB={...RB};pubOpen();await add(-tot);let n=R(37);{const b=gb('roul');if(b>0&&ret(n)<tot&&R(10000)<b*100){const c=[...Array(37).keys()].filter(x=>ret(x)>tot);if(c.length)n=c[R(c.length)]}else if(b<0&&ret(n)>=tot&&R(10000)<-b*100){const c=[...Array(37).keys()].filter(x=>ret(x)<tot);if(c.length)n=c[R(c.length)]}}
+ busy=1;cur=tot;LRB={...RB};const SB={...RB},retS=(m,B)=>Object.entries(B).reduce((a,[k,v])=>a+(cov(k).includes(m)?v*mult(k):(m==0&&EM.includes(k)?v/2:0)),0);pubOpen();await add(-tot);let n=R(37);{const b=gb('roul');if(b>0&&retS(n,SB)<tot&&R(10000)<b*100){const c=[...Array(37).keys()].filter(x=>retS(x,SB)>tot);if(c.length)n=c[R(c.length)]}else if(b<0&&retS(n,SB)>=tot&&R(10000)<-b*100){const c=[...Array(37).keys()].filter(x=>retS(x,SB)<tot);if(c.length)n=c[R(c.length)]}}
  const P2=2*Math.PI,idx=WO.indexOf(n),from=wrot%P2,dd=(((-idx*P2/37-from)%P2)+P2)%P2,to=from+10*Math.PI+dd,t0=performance.now();let ls=0;
  await new Promise(r=>{(function f(now){const k=Math.min(1,(now-t0)/4200),e2=1-Math.pow(1-k,3);wrot=from+(to-from)*e2;wheel(wrot,-(1-e2)*P2*7,109-(k>.7?(k-.7)/.3*17:0));const s=Math.floor(wrot/(P2/37));if(s!=ls){ls=s;tone(900,.03,0,'square',.03)}k<1?requestAnimationFrame(f):r()})(t0)});wrot=to;
- const e=$('#rnum');e.textContent=n;e.className='rn '+cl(n);const rt=Math.floor(ret(n));RH.unshift(n);RH.length=Math.min(RH.length,30);L.set('rh',RH);rhd();RB={};RS=[];SEL=null;rbDraw();
+ const e=$('#rnum');e.textContent=n;e.className='rn '+cl(n);const rt=Math.floor(retS(n,SB));RH.unshift(n);RH.length=Math.min(RH.length,30);L.set('rh',RH);rhd();RB={};RS=[];SEL=null;rbDraw();
  await fin('roul',rt/tot,`${n} ${n?(RED.has(n)?'RED':'BLACK'):'ZERO（1:1ベットは半額返却）'}`)}
 /* ===== v11: 本格ビデオポーカー（9/6 ジャックス・オア・ベター／1〜5コイン／ダブルアップ） ===== */
 const PTV=[['ロイヤルフラッシュ',[250,500,750,1000,4000]],['ストレートフラッシュ',[50,100,150,200,250]],['フォーカード',[25,50,75,100,125]],['フルハウス',[9,18,27,36,45]],['フラッシュ',[6,12,18,24,30]],['ストレート',[4,8,12,16,20]],['スリーカード',[3,6,9,12,15]],['ツーペア',[2,4,6,8,10]],['ジャックス・オア・ベター',[1,2,3,4,5]]];
@@ -836,13 +836,13 @@ async function admDel(h){if(!OWNER.includes(me.name))return;const n=PN[h];if(!n)
  const ln=await get('bank/'+h),warn=ln&&ln.st=='active'?'（借入中です）':'';
  if(!confirm(`「${n}」のアカウントを削除します${warn}。\n所持金・履歴・借入・ログインボーナス・宝くじなど、全てのデータが消えて、元に戻せません。よろしいですか？`))return;
  await set('del/'+h,{t:Date.now(),n});
- await Promise.all(['players/'+h,'hist/'+h,'vip/'+h,'bank/'+h,'lb/'+h,'pres/'+h,'live/'+h,'stream/'+h,'lott/'+h].map(p=>set(p,null)));
+ await Promise.all(['players/'+h,'hist/'+h,'vip/'+h,'bank/'+h,'lb/'+h,'pres/'+h,'live/'+h,'stream/'+h,'lott/'+h,'collection/'+h].map(p=>set(p,null)));
  const lots=(await get('lot'))||{};for(const k of Object.keys(lots))if(lots[k]&&lots[k].t&&lots[k].t[h])await set('lot/'+k+'/t/'+h,null);
  const c={...DEF,...((await get('cfg/main'))||{})};if(c.pb)delete c.pb[h];if(c.ban)delete c.ban[h];await set('cfg/main',c);Object.assign(cfg,{pb:c.pb,ban:c.ban});
  toast(`${n} のアカウントを削除しました`);rAdm()}
 var loginT=0,dmiss=0;const _lg5=login_;login_=async function(n){loginT=Date.now();dmiss=0;await _lg5(n)};
 async function delSweep(){if(!me||!DB_URL||Date.now()-loginT<20000)return;try{const d=await (await tmo(fetch(U('players/'+pid)))).json();if(d){dmiss=0;return}if(++dmiss<2)return;
- const m=await (await tmo(fetch(U('del/'+pid)))).json();if(m){toast('このアカウントは削除されました');await Promise.all(['players/'+pid,'hist/'+pid,'vip/'+pid].map(p=>set(p,null)));logout()}}catch(e){}}
+ const m=await (await tmo(fetch(U('del/'+pid)))).json();if(m){toast('このアカウントは削除されました');await Promise.all(['players/'+pid,'hist/'+pid,'vip/'+pid,'collection/'+pid].map(p=>set(p,null)));logout()}}catch(e){}}
 setInterval(delSweep,8000);
 
 /* ===== v22: スロット/パチスロ高難易度化＋GM専用の裏コマンド（残高を5回タップ） ===== */
@@ -870,4 +870,196 @@ async function bkAdd(){const a=Math.floor(+$('#bkx').value||0);if(!(a>=1)||a>1e9
 async function bkArCancel(){const d=await get('bank/'+pid);if(d&&d.st=='active'&&d.ar){const r={...d};delete r.ar;await set('bank/'+pid,r)}bankR()}
 async function bkAddOk(p){if(!OWNER.includes(me.name))return;const d=await get('bank/'+p);if(!d||d.st!='active'||!d.ar)return;const a=Math.floor(+$('#baa_'+p).value||0),r=Math.max(0,Math.min(100,+$('#bra_'+p).value||0));if(!(a>=1))return toast('金額が不正です');await set('bank/'+p,{st:'approved',n:d.n,amt:bkBal(d)+a,inc:a,rate:r,t:Date.now()});toast(`${d.n} への追加融資を承認しました（+${a.toLocaleString()}C・${r}%/日）`);bankR()}
 async function bkAddNo(p){if(!OWNER.includes(me.name))return;const d=await get('bank/'+p);if(d&&d.st=='active'&&d.ar){const r={...d};delete r.ar;await set('bank/'+p,r)}bankR()}
-</script></body></html>
+/* ===== v26: ルーレットのオールイン ===== */
+var RALL=false;
+const fmtK=a=>a>=1e9?parseFloat((a/1e9).toFixed(2))+'B':a>=1e6?parseFloat((a/1e6).toFixed(2))+'M':a>=1000?parseFloat((a/1e3).toFixed(1))+'K':a;
+function allIn(){if(CT=='roul'){if(busy)return;RALL=!RALL;$('#m-roul').className='msg';$('#m-roul').textContent=RALL?'ALL IN：賭けたい場所をタップすると、置ける全額を賭けます（もう一度押すと取り消し）':(rsum()?`BET 合計 ${rsum().toLocaleString()}C`:'チップを置いてください');return}sb(me.money)}
+const _pkA=pick;pick=function(v){RALL=false;_pkA(v)};
+var RLK=false;const _rsA=rlSpin;rlSpin=async function(){if(RLK||busy)return;RLK=true;RALL=false;try{return await _rsA()}finally{RLK=false}};
+</script>
+<script>
+/* ===== ROYAL COLLECTION / FRAGMENT SYSTEM ===== */
+(function(){
+'use strict';
+
+const COL_RARITIES=['N','R','SR','SSR','UR'];
+const COL_RATES={N:58,R:27,SR:10,SSR:4,UR:1}; // 合計100%。この定数を変更すると排出率を調整できます。
+const COL_DUST_DUP={N:20,R:45,SR:110,SSR:280,UR:700};
+const COL_DUST_COST={N:80,R:200,SR:550,SSR:1400,UR:3500};
+const COL_FRAGMENT_RATE={N:.005,R:.008,SR:.012,SSR:.016,UR:.020};
+const COL_SOLO_GAMES=['slot','pachi','roul','bj','pk','hl'];
+const COL_GAME_NAMES={slot:'スロット',pachi:'パチスロ',roul:'ルーレット',bj:'ブラックジャック',pk:'ビデオポーカー',hl:'ハイ＆ロー'};
+const COL_COSMETIC_SEEDS=[
+ {type:'plate',label:'ネームプレート',names:['エメラルド・ライン','ルビー・フレーム','ゴールド・エングレーブ','ブラック・ロイヤル','エンペラーズ・シグネット'],icons:['♧','♦','♛','♜','♕'],desc:['深緑の細い装飾を施したプレート','深紅と銀の縁取り','金の彫刻をあしらったプレート','黒曜石と金の重厚な額縁','皇帝の紋章を刻んだ特別仕様']},
+ {type:'bg',label:'プロフィール背景',names:['ベルベット・グリーン','クリムゾン・サロン','ミッドナイト・ゴールド','ロイヤル・サロン','インペリアル・ホール'],icons:['▰','◈','✦','♜','♛'],desc:['深緑のベルベットを思わせる背景','深い赤のサロンをイメージ','夜のサロンに金の光が差す背景','王室のホールを描いた背景','皇帝の間をイメージした限定背景']},
+ {type:'icon',label:'プレイヤーアイコン',names:['スペード','ルビー','クラウン','ダイヤモンド・キング','フェニックス'],icons:['♠','♦','♛','💎','♜'],desc:['クラシックなスペードの紋章','深紅の宝石','王冠のエンブレム','王室のダイヤモンド','伝説の不死鳥を象った紋章']},
+ {type:'card',label:'カードデザイン',names:['アイボリー','クリムゾン・エッジ','マーブル・ゴールド','ロイヤル・デッキ','エンパイア・デッキ'],icons:['▤','▤','▤','▤','▤'],desc:['アイボリーを基調にしたカード','深紅の縁取りを持つデザイン','大理石と金箔のデザイン','王室仕様のカードデザイン','最高位の意匠を施したデッキ']},
+ {type:'chip',label:'チップデザイン',names:['クラシック・チップ','ゴールド・リング','ブラックゴールド','ロイヤル・チップ','エンパイア・チップ'],icons:['◉','◉','◉','◉','◉'],desc:['伝統的なカジノチップ','金色のリングを刻んだチップ','黒と金の重厚なチップ','王室の紋章入りチップ','帝国の紋章を刻んだ特別チップ']},
+ {type:'title',label:'特別な称号',names:['サロンの新星','テーブルの名手','ゴールド・ハイローラー','ロイヤル・エース','伝説の支配人'],icons:['✧','♠','♛','♕','★'],desc:['サロンに現れた期待の新人','テーブルを知り尽くした者','黄金の名を持つプレイヤー','王室に認められたエース','伝説として名を残す者']}
+];
+const COL_FRAGMENT_SEEDS=[
+ {type:'fragment',category:'LUCK',names:['運命のコイン','四つ葉の護符','星読みの水晶','女神のルーレット','天運の王冠'],icons:['◉','♣','✧','☼','♛']},
+ {type:'fragment',category:'FORTUNE',names:['黄金の残響','富の紋章','金庫の鍵','王室の祝福','エンペラーズ・レガシー'],icons:['◈','♜','⚿','♕','♛']},
+ {type:'fragment',category:'CONTROL',names:['カード・リーダー','確率の羅針盤','ディーラーの眼','運命の支配者','ロイヤル・コントロール'],icons:['♠','⌖','◎','♜','♛']},
+ {type:'fragment',category:'DEFENSE',names:['銀の盾','守護の紋章','不落の城壁','王の防壁','絶対防護の王冠'],icons:['⬡','⛨','▥','♜','♛']},
+ {type:'fragment',category:'SPECIAL',names:['小さな王冠','星屑の欠片','幸運の残光','幻のトランプ','神話の王冠'],icons:['♛','✦','☄','♠','♕']}
+];
+const COL_RARITY_DESC={N:'NORMAL',R:'RARE',SR:'SUPER RARE',SSR:'DOUBLE SUPER RARE',UR:'ULTRA RARE'};
+const COL_ITEMS=[];
+COL_COSMETIC_SEEDS.forEach(seed=>seed.names.forEach((name,i)=>{
+ const rarity=COL_RARITIES[i],id=`cos_${seed.type}_${rarity.toLowerCase()}`;
+ COL_ITEMS.push({id,type:seed.type,slot:seed.type,label:seed.label,name,rarity,icon:seed.icons[i],desc:seed.desc[i]});
+}));
+COL_FRAGMENT_SEEDS.forEach(seed=>seed.names.forEach((name,i)=>{
+ const rarity=COL_RARITIES[i],rate=COL_FRAGMENT_RATE[rarity],id=`frag_${seed.category.toLowerCase()}_${rarity.toLowerCase()}`;
+ COL_ITEMS.push({id,type:'fragment',category:seed.category,name,rarity,icon:seed.icons[i],rate,desc:colFragmentDesc(seed.category,rate)});
+}));
+function colFragmentDesc(category,rate){
+ const p=(rate*100).toFixed(1).replace(/\.0$/,'');
+ if(category==='LUCK')return `対象ゲームで負けたとき、${p}%の確率でその回を引き分け扱いにします。成功は1日1回まで。`;
+ if(category==='FORTUNE')return `対象ゲームで払戻が賭け金を上回った場合、利益部分を${p}%上乗せします。`;
+ if(category==='CONTROL')return `HIGH & LOWで「SAME」を選んで同じ数字が出たとき、連勝ポットの倍率を${p}%上乗せします。`;
+ if(category==='DEFENSE')return `対象ゲームで負けた場合、賭け金の${p}%を返還します。`;
+ return `対象ゲームで勝ったとき、${p}%の確率で交換素材「クラウンダスト」を1個獲得します。`;
+}
+function colDate(){const d=new Date(Date.now()+9*3600000);return `${d.getUTCFullYear()}-${String(d.getUTCMonth()+1).padStart(2,'0')}-${String(d.getUTCDate()).padStart(2,'0')}`}
+function colNewState(){return {v:1,starter:false,medals:0,dust:0,owned:[],equippedFragments:[null,null,null],equippedCosmetics:{},history:[],draws:0,pity:0,lastDaily:'',lastLuckDate:''}}
+function colNormalise(raw){const d={...colNewState(),...(raw&&typeof raw==='object'?raw:{})};
+ if(!Array.isArray(d.owned))d.owned=[];if(!Array.isArray(d.equippedFragments))d.equippedFragments=[null,null,null];
+ d.equippedFragments=[d.equippedFragments[0]||null,d.equippedFragments[1]||null,d.equippedFragments[2]||null];
+ if(!d.equippedCosmetics||typeof d.equippedCosmetics!=='object')d.equippedCosmetics={};
+ if(!Array.isArray(d.history))d.history=[];d.medals=Math.max(0,Math.floor(+d.medals||0));d.dust=Math.max(0,Math.floor(+d.dust||0));d.draws=Math.max(0,Math.floor(+d.draws||0));d.pity=Math.max(0,Math.min(99,Math.floor(+d.pity||0)));return d;
+}
+let COL_STATE=null,COL_BUSY=false,COL_REVEAL_TIMER=0,COL_REVEAL_REVEAL=null;
+const COL_PATH=()=>`collection/${pid}`;
+async function colSave(){if(!me||!COL_STATE)return false;const data=JSON.parse(JSON.stringify(COL_STATE));L.set('collection/'+pid,data);
+ if(DB_URL){try{const res=await tmo(fetch(U(COL_PATH()),{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify(data)}),6000);if(!res.ok)throw new Error('HTTP '+res.status);return true}catch(e){toast('コレクションの共有保存に失敗しました。端末内には保存されています');return false}}
+ return true;
+}
+async function colLoad(){if(!me)return;let raw=null;try{raw=await get(COL_PATH())}catch(e){}COL_STATE=colNormalise(raw);let changed=false;
+ let reward=0;if(!COL_STATE.starter){COL_STATE.starter=true;COL_STATE.medals+=900;reward+=900;changed=true}
+ const today=colDate();if(COL_STATE.lastDaily!==today){COL_STATE.lastDaily=today;COL_STATE.medals+=100;reward+=100;changed=true}if(reward)toast(`ROYAL COLLECTION：無料メダル +${reward.toLocaleString()}枚を受け取りました`);
+ if(changed)await colSave();colRenderProfile();
+}
+function colItem(id){return COL_ITEMS.find(x=>x.id===id)||null}
+function colOwnedItems(){return COL_ITEMS.filter(x=>COL_STATE&&COL_STATE.owned.includes(x.id))}
+function colEquippedFragments(){return (COL_STATE?.equippedFragments||[]).map(colItem).filter(x=>x&&x.type==='fragment')}
+function colEffects(){const fs=colEquippedFragments();const total=k=>fs.filter(x=>x.category===k).reduce((a,x)=>a+(x.rate||0),0);return {luck:Math.min(.03,total('LUCK')),fortune:Math.min(.06,total('FORTUNE')),control:Math.min(.05,total('CONTROL')),defense:Math.min(.05,total('DEFENSE')),special:Math.min(.12,total('SPECIAL'))}}
+function colPct(v){return (v*100).toFixed(1).replace(/\.0$/,'')+'%'}
+function colRarityClass(r){return 'col-r-'+String(r||'N').toLowerCase()}
+function colEsc(s){return E(String(s??''))}
+function colTopNav(){return `<div class="col-nav"><button class="s" onclick="tab('collection')">COLLECTION</button><button class="s" onclick="tab('fragments')">FRAGMENTS</button><button class="s" onclick="tab('exchange')">EXCHANGE</button></div>`}
+function colRenderProfile(){if(!me||!COL_STATE)return;const pick=type=>colItem(COL_STATE.equippedCosmetics[type]);const plate=pick('plate'),bg=pick('bg'),icon=pick('icon'),title=pick('title'),card=pick('card'),chip=pick('chip');
+ const who=$('#who');if(who){who.innerHTML=`<div class="col-identity ${plate?colRarityClass(plate.rarity):''}" style="${bg?`--col-profile-bg:${bg.rarity==='UR'?'linear-gradient(120deg,#4b0d18,#16110a 65%,#9b752c)':bg.rarity==='SSR'?'linear-gradient(120deg,#3b0b14,#14110e 70%,#6f2027)': 'linear-gradient(120deg,#15221d,#111 70%,#5a4624)'}`:'--col-profile-bg:linear-gradient(120deg,#171311,#090909)'}"><span class="col-profile-icon">${icon?icon.icon:'♟'}</span><span><b>${colEsc(me.name)}</b>${title?`<small>${colEsc(title.name)}</small>`:''}</span></div>`}
+ document.body.dataset.colCard=card?card.id:'';document.body.dataset.colChip=chip?chip.id:'';
+}
+function colRarityName(r){return `${r} · ${COL_RARITY_DESC[r]||''}`}
+function colCosmeticButton(it){const eq=COL_STATE.equippedCosmetics[it.type]===it.id;return `<article class="col-item ${colRarityClass(it.rarity)}"><div class="col-item-icon">${colEsc(it.icon)}</div><div class="col-item-main"><div class="col-item-kicker">${colEsc(it.label)} / ${colRarityName(it.rarity)}</div><b>${colEsc(it.name)}</b><p>${colEsc(it.desc)}</p><button class="s col-action" onclick="colEquipCosmetic('${it.id}')">${eq?'装備解除':'装備する'}</button></div>${eq?'<span class="col-equipped">EQUIPPED</span>':''}</article>`}
+function colRenderCollection(){if(!COL_STATE)return;const owned=colOwnedItems().filter(x=>x.type!=='fragment');const hist=COL_STATE.history.slice(0,14);
+ $('#collection').innerHTML=colTopNav()+`<div class="col-head"><div class="lt">ROYAL COLLECTION</div><h2>THE ROYAL VAULT</h2><p>ロイヤルカジノ専用コレクション。装飾品とフラグメントを集め、自分だけのスタイルを整えよう。</p></div>
+ <div class="col-wallet"><div><small>ROYAL MEDALS</small><b>${COL_STATE.medals.toLocaleString()} <small>枚</small></b></div><div><small>CROWN DUST</small><b>${COL_STATE.dust.toLocaleString()} <small>個</small></b></div><div><small>UR保証まで</small><b>${Math.max(0,100-COL_STATE.pity)} <small>回</small></b></div></div>
+ <div class="col-banner"><div class="col-banner-mark">♛</div><div><div class="col-kicker">LIMITED COLLECTION ・ PERMANENT</div><h3>ROYAL RELIC GACHA</h3><p>現実のお金は不要。専用メダルのみで利用できます。</p></div></div>
+ <div class="col-pull-buttons"><button onclick="colPull(1)"><b>1回引く</b><small>100 MEDALS</small></button><button onclick="colPull(10)" class="col-ten"><b>10回引く</b><small>900 MEDALS ・ 10連割引</small></button></div>
+ <div class="col-rates"><b>排出率・保証について</b><div class="col-rate-grid">${COL_RARITIES.slice().reverse().map(r=>`<div><b class="${colRarityClass(r)}">${r}</b><span>${COL_RATES[r].toFixed( r==='N'||r==='R'?0:1)}%</span></div>`).join('')}</div><p>10連はR以上が1個以上確定。URはUR以外が99回続くと、次の1回が確定でURになります。天井カウントはプレイヤーごとに保存されます。</p><p>重複アイテムはレアリティに応じてクラウンダストに自動変換されます。</p></div>
+ <div class="col-section"><div class="col-section-title"><b>COLLECTED COSMETICS</b><span>${owned.length} ITEMS</span></div>${owned.length?owned.map(colCosmeticButton).join(''):'<div class="col-empty">まだ装飾アイテムを所持していません。ガチャで獲得すると、ここに追加されます。</div>'}</div>
+ <div class="col-section"><div class="col-section-title"><b>RECENT ACQUISITIONS</b><span>直近14件</span></div>${hist.length?hist.map(h=>`<div class="col-history"><span class="${colRarityClass(h.rarity)}">${colEsc(h.rarity)}</span><b>${colEsc(h.name)}</b><small>${h.duplicate?`重複 → ダスト +${h.dust||0}`:'NEW ITEM'}</small><time>${new Date(h.t).toLocaleString('ja-JP',{month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit'})}</time></div>`).join(''):'<div class="col-empty">ガチャ履歴はまだありません。</div>'}</div>`;
+}
+function colFragmentEffectLine(it){const p=colPct(it.rate||0);switch(it.category){case'LUCK':return `負けた回を引き分けにする抽選：${p}（成功は1日1回）`;case'FORTUNE':return `勝利時の利益上乗せ：${p}`;case'CONTROL':return `HIGH & LOW「SAME」成功時の倍率上乗せ：${p}`;case'DEFENSE':return `敗北時の賭け金返還：${p}`;default:return `勝利時にダスト1個を得る確率：${p}`}}
+function colFragmentSupportLine(it){return it.category==='CONTROL'?'対応ゲーム：HIGH & LOW（SAME予想のみ）':'対応ゲーム：スロット／パチスロ／ルーレット／ブラックジャック／ビデオポーカー／ハイ＆ロー'}
+function colRenderFragments(){if(!COL_STATE)return;const fs=colOwnedItems().filter(x=>x.type==='fragment'),eq=COL_STATE.equippedFragments,eff=colEffects();
+ $('#fragments').innerHTML=colTopNav()+`<div class="col-head"><div class="lt">FRAGMENT SYSTEM</div><h2>THREE SLOTS</h2><p>所持フラグメントから最大3個を装備できます。同じフラグメントを複数枠に入れることはできません。</p></div>
+ <div class="col-slots">${[0,1,2].map(i=>{const it=colItem(eq[i]);return `<div class="col-slot ${it?colRarityClass(it.rarity):'col-slot-empty'}"><small>SLOT 0${i+1}</small>${it?`<div class="col-slot-symbol">${colEsc(it.icon)}</div><b>${colEsc(it.name)}</b><span class="${colRarityClass(it.rarity)}">${it.rarity} / ${it.category}</span><button class="s" onclick="colUnequipFragment(${i})">解除する</button>`:'<div class="col-slot-symbol">＋</div><b>EMPTY SLOT</b><span>フラグメント未装備</span>'}</div>`}).join('')}</div>
+ <div class="col-section"><div class="col-section-title"><b>ACTIVE EFFECTS</b><span>現在発動中</span></div><div class="col-active-effects">${[['LUCK','幸運',eff.luck,'上限3%'],['FORTUNE','報酬',eff.fortune,'上限6%'],['CONTROL','操作',eff.control,'上限5%'],['DEFENSE','防御',eff.defense,'上限5%'],['SPECIAL','特殊',eff.special,'上限12%']].map(([k,n,v,cap])=>`<div><span>${k} / ${n}<small style="display:block;opacity:.55;font-size:9px">${cap}</small></span><b>${colPct(v)}</b></div>`).join('')}</div><p class="col-note">効果はソロゲーム用です。LUCKは1日1回まで、確率・倍率上昇には上限があります。部屋対戦・観戦予想・宝くじ・練習モードには適用されません。</p></div>
+ <div class="col-section"><div class="col-section-title"><b>OWNED FRAGMENTS</b><span>${fs.length} TYPES</span></div>${fs.length?fs.map(it=>{const slot=eq.indexOf(it.id),isEq=slot>=0;return `<article class="col-item ${colRarityClass(it.rarity)}"><div class="col-item-icon">${colEsc(it.icon)}</div><div class="col-item-main"><div class="col-item-kicker">${it.category} / ${colRarityName(it.rarity)}</div><b>${colEsc(it.name)}</b><p>${colEsc(it.desc)}</p><small class="col-frag-effect">${colEsc(colFragmentEffectLine(it))}</small><small class="col-frag-effect">${colEsc(colFragmentSupportLine(it))}</small><button class="s col-action" ${isEq||eq.filter(Boolean).length>=3?'disabled':''} onclick="colEquipFragment('${it.id}')">${isEq?'装備中':eq.filter(Boolean).length>=3?'空き枠なし':'装備する'}</button>${isEq?`<button class="s col-action" onclick="colUnequipFragment(${slot})">解除</button>`:''}</div>${isEq?'<span class="col-equipped">EQUIPPED</span>':''}</article>`}).join(''):'<div class="col-empty">フラグメントはまだありません。ガチャまたは交換所で入手できます。</div>'}</div>`;
+}
+function colRenderExchange(){if(!COL_STATE)return;const list=COL_ITEMS.filter(x=>!COL_STATE.owned.includes(x.id));
+ $('#exchange').innerHTML=colTopNav()+`<div class="col-head"><div class="lt">ROYAL EXCHANGE</div><h2>THE EXCHANGE</h2><p>重複アイテムから得たクラウンダストを使い、未所持のアイテムと交換できます。</p></div><div class="col-wallet col-wallet-one"><div><small>CROWN DUST</small><b>${COL_STATE.dust.toLocaleString()} <small>個</small></b></div></div><div class="col-note">交換後のアイテムは所持品に追加され、装備画面から選択できるようになります。</div><div class="col-section"><div class="col-section-title"><b>AVAILABLE ITEMS</b><span>${list.length} ITEMS</span></div>${list.length?list.map(it=>{const cost=COL_DUST_COST[it.rarity];return `<article class="col-item ${colRarityClass(it.rarity)}"><div class="col-item-icon">${colEsc(it.icon)}</div><div class="col-item-main"><div class="col-item-kicker">${it.type==='fragment'?it.category:it.label} / ${colRarityName(it.rarity)}</div><b>${colEsc(it.name)}</b><p>${colEsc(it.desc)}</p><div class="col-cost">交換費用：<b>${cost.toLocaleString()} DUST</b></div><button class="s col-action" ${COL_STATE.dust<cost?'disabled':''} onclick="colExchange('${it.id}')">交換する</button></div></article>`}).join(''):'<div class="col-empty">すべてのアイテムを所持しています。新しいアイテムの追加をお待ちください。</div>'}</div>`;
+}
+function colRenderAll(){if(!COL_STATE)return;colRenderProfile();if(!$('#collection').hidden)colRenderCollection();if(!$('#fragments').hidden)colRenderFragments();if(!$('#exchange').hidden)colRenderExchange()}
+function colGo(t){tab(t)}
+async function colEquipCosmetic(id){if(!COL_STATE||!COL_STATE.owned.includes(id))return;const it=colItem(id);if(!it||it.type==='fragment')return;COL_STATE.equippedCosmetics=COL_STATE.equippedCosmetics||{};if(COL_STATE.equippedCosmetics[it.type]===id)delete COL_STATE.equippedCosmetics[it.type];else COL_STATE.equippedCosmetics[it.type]=id;await colSave();colRenderAll();toast(it.name+(COL_STATE.equippedCosmetics[it.type]?' を装備しました':' を解除しました'))}
+async function colEquipFragment(id){if(!COL_STATE||!COL_STATE.owned.includes(id))return;const it=colItem(id);if(!it||it.type!=='fragment')return;const slots=COL_STATE.equippedFragments;if(slots.includes(id))return toast('同じフラグメントは複数枠に装備できません');const i=slots.findIndex(x=>!x);if(i<0)return toast('装備枠がいっぱいです。先に解除してください');slots[i]=id;await colSave();colRenderAll();toast(it.name+' を装備しました')}
+async function colUnequipFragment(i){if(!COL_STATE||i<0||i>2)return;COL_STATE.equippedFragments[i]=null;await colSave();colRenderAll();toast('フラグメントを解除しました')}
+async function colExchange(id){if(!COL_STATE||COL_BUSY)return;const it=colItem(id);if(!it||COL_STATE.owned.includes(id))return;const cost=COL_DUST_COST[it.rarity];if(COL_STATE.dust<cost)return toast('クラウンダストが不足しています');COL_BUSY=true;COL_STATE.dust-=cost;COL_STATE.owned.push(id);COL_STATE.history.unshift({id:it.id,name:it.name,rarity:it.rarity,t:Date.now(),duplicate:false,exchange:true});COL_STATE.history=COL_STATE.history.slice(0,80);await colSave();COL_BUSY=false;colRenderAll();toast(it.name+' と交換しました')}
+function colChooseRarity(){let r=Math.random()*100;for(const k of ['UR','SSR','SR','R','N']){if(r<COL_RATES[k])return k;r-=COL_RATES[k]}return 'N'}
+function colRollOne(){let rarity=COL_STATE.pity>=99?'UR':colChooseRarity();const pool=COL_ITEMS.filter(x=>x.rarity===rarity);const item=pool[Math.floor(Math.random()*pool.length)];if(rarity==='UR')COL_STATE.pity=0;else COL_STATE.pity++;COL_STATE.draws++;return item}
+function colBuildResultCards(results){return results.map((x,i)=>`<article class="col-reward ${colRarityClass(x.item.rarity)}" style="--delay:${i*65}ms"><div class="col-reward-shine"></div><div class="col-reward-rarity">${x.item.rarity} / ${COL_RARITY_DESC[x.item.rarity]}</div><div class="col-reward-icon">${colEsc(x.item.icon)}</div><b>${colEsc(x.item.name)}</b><small>${x.item.type==='fragment'?'FRAGMENT':x.item.label||'COSMETIC'}</small>${x.duplicate?`<em>DUPLICATE ・ +${x.dust} DUST</em>`:'<em class="col-new">NEW ACQUISITION</em>'}</article>`).join('')}
+function colShowReveal(results){const best=results.reduce((a,x)=>COL_RARITIES.indexOf(x.item.rarity)>COL_RARITIES.indexOf(a)?x.item.rarity:a,'N');const time=best==='UR'?2400:best==='SSR'?1900:best==='SR'?1500:best==='R'?1100:850;
+ const layer=document.createElement('div');layer.id='colReveal';layer.className='col-reveal-overlay '+(best==='UR'?'col-ur':best==='SSR'?'col-ssr':'');
+ layer.innerHTML=`<div class="col-reveal-stage"><div class="col-reveal-brand">ROYAL COLLECTION</div><div class="col-reveal-line"></div><div class="col-reveal-wait" id="colRevealWait"><div class="col-seal">♛</div><b>${best==='UR'?'THE IMPERIAL SEAL':best==='SSR'?'ROYAL SEAL':'A NEW ACQUISITION'}</b><small>封印を解いています…</small></div><div class="col-reveal-content" id="colRevealContent" hidden><div class="col-reveal-title">${best==='UR'?'ULTRA RARE DISCOVERED':best==='SSR'?'DOUBLE SUPER RARE':'ACQUISITIONS'}</div><div class="col-reveal-grid">${colBuildResultCards(results)}</div><div class="col-reveal-summary">${results.length}件獲得 ・ UR保証まで ${100-COL_STATE.pity}回</div><button onclick="colCloseReveal()">閉じる</button></div><button class="col-skip" id="colRevealSkip" onclick="colSkipReveal()">演出をスキップ</button></div>`;
+ document.body.appendChild(layer);
+ const reveal=()=>{const w=$('#colRevealWait'),c=$('#colRevealContent'),s=$('#colRevealSkip');if(!layer.isConnected||!c)return;w.hidden=true;c.hidden=false;s.textContent='閉じる';s.onclick=colCloseReveal;layer.classList.add('col-revealed')};COL_REVEAL_REVEAL=reveal;COL_REVEAL_TIMER=setTimeout(reveal,time);
+ if(best==='UR'){try{[392,523,659,784,1047].forEach((f,i)=>tone(f,.42,i*.11,'triangle',.18))}catch(e){}}
+ else if(best==='SSR'){try{[392,523,659,784].forEach((f,i)=>tone(f,.24,i*.09,'triangle',.13))}catch(e){}}
+ else {try{tone(best==='SR'?660:best==='R'?520:420,.25,0,'triangle',.1)}catch(e){}}
+}
+function colSkipReveal(){if(COL_REVEAL_TIMER)clearTimeout(COL_REVEAL_TIMER);if(COL_REVEAL_REVEAL)COL_REVEAL_REVEAL()}
+function colCloseReveal(){if(COL_REVEAL_TIMER)clearTimeout(COL_REVEAL_TIMER);const x=$('#colReveal');if(x)x.remove();COL_REVEAL_REVEAL=null}
+async function colPull(count){if(!me||!COL_STATE)return toast('ログインしてください');if(PRAC)return toast('練習モード中はガチャを利用できません');if(COL_BUSY)return;const cost=count===10?900:100;if(COL_STATE.medals<cost)return toast('ロイヤルメダルが不足しています');COL_BUSY=true;
+ try{COL_STATE.medals-=cost;const results=[];for(let i=0;i<count;i++)results.push({item:colRollOne(),duplicate:false,dust:0});
+  if(count===10&&!results.some(x=>x.item.rarity!=='N')){const pool=COL_ITEMS.filter(x=>x.rarity==='R');results[9].item=pool[Math.floor(Math.random()*pool.length)];}
+  results.forEach(x=>{const it=x.item;if(COL_STATE.owned.includes(it.id)){x.duplicate=true;x.dust=COL_DUST_DUP[it.rarity];COL_STATE.dust+=x.dust}else{COL_STATE.owned.push(it.id)}});
+  const now=Date.now();results.forEach(x=>COL_STATE.history.unshift({id:x.item.id,name:x.item.name,rarity:x.item.rarity,t:now,duplicate:x.duplicate,dust:x.dust}));COL_STATE.history=COL_STATE.history.slice(0,80);
+  await colSave();colRenderAll();colShowReveal(results);
+ }catch(e){console.error(e);toast('ガチャ処理でエラーが発生しました')}finally{COL_BUSY=false;}
+}
+
+function colFragmentSupported(category){if(category==='CONTROL')return 'HIGH & LOW（SAME選択時）';return COL_GAME_NAMES&&category==='LUCK'?'スロット／パチスロ／ルーレット／ブラックジャック／ポーカー／ハイ＆ロー':'ソロゲーム（練習モードを除く）'}
+function colRenderProfileAfterLogin(){if(!COL_STATE)return;colRenderProfile()}
+
+/* 既存ロビーへ追加。ゲーム画面と従来データは触らない。 */
+$('#lobby').insertAdjacentHTML('beforeend',gc('collection','ROYAL COLLECTION','ガチャで装飾品とフラグメントを収集。専用メダル・交換所・装備管理。','<div style="font:42px Georgia;color:#d8b25a;text-shadow:0 0 18px #a8812f">♛</div>'));
+$('#tabs').insertAdjacentHTML('afterend','<div class="box" id="collection" hidden></div><div class="box" id="fragments" hidden></div><div class="box" id="exchange" hidden></div>');
+$('#top>div:last-child').insertAdjacentHTML('afterbegin','<button class="s" onclick="tab(\'collection\')">COLLECTION</button>');
+GN.collection='ROYAL COLLECTION';GN.fragments='FRAGMENTS';GN.exchange='EXCHANGE';
+
+/* 独立ページを既存tab関数へ追加 */
+const colTabBefore=tab;tab=function(t){colTabBefore(t);['collection','fragments','exchange'].forEach(k=>{const e=$('#'+k);if(e)e.hidden=k!==t});if(t==='collection')colRenderCollection();if(t==='fragments')colRenderFragments();if(t==='exchange')colRenderExchange();if(['collection','fragments','exchange'].includes(t))$('#tray').hidden=true};
+
+/* ログイン時にプレイヤー別コレクションを読込。退出時は表示だけ初期化。 */
+const colLoginBefore=login_;login_=async function(n){await colLoginBefore(n);await colLoad();};
+const colLogoutBefore=logout;logout=function(){COL_STATE=null;colLogoutBefore()};
+
+/* ゲーム効果：ソロゲームのみに限定し、数値上限を設定。 */
+const colFinBefore=fin;fin=async function(id,w,t){
+ if(!COL_STATE||PRAC||!COL_SOLO_GAMES.includes(id))return colFinBefore(id,w,t);
+ const eff=colEffects(),today=colDate();let nextW=w,msg=String(t||''),refund=0,bonusDust=false;
+ if(nextW<=0&&eff.luck>0&&COL_STATE.lastLuckDate!==today&&Math.random()<eff.luck){nextW=1;COL_STATE.lastLuckDate=today;msg+=' ｜LUCK発動：損失を引き分けに変更';await colSave()}
+ if(nextW>1&&eff.fortune>0){nextW=1+(nextW-1)*(1+eff.fortune);msg+=` ｜FORTUNE +${colPct(eff.fortune)}`}
+ if(nextW<=0&&eff.defense>0&&cur>0)refund=Math.min(cur,Math.floor(cur*eff.defense));
+ if(nextW>1&&eff.special>0&&Math.random()<eff.special){COL_STATE.dust+=1;bonusDust=true;await colSave()}
+ await colFinBefore(id,nextW,msg);
+ if(refund>0){await add(refund);try{let h=L.get('hist/'+pid)||[];h=Array.isArray(h)?h:Object.values(h||{});if(h.length){h[0].p=(+h[0].p||0)+refund;h[0].bal=(+h[0].bal||0)+refund;await set('hist/'+pid,h.slice(0,40))}}catch(e){}const el=$('#m-'+id);if(el)el.textContent+=' ｜DEFENSE 返還 +'+refund.toLocaleString()+'C'}
+ if(bonusDust){const el=$('#m-'+id);if(el)el.textContent+=' ｜SPECIAL クラウンダスト +1';toast('SPECIAL発動：クラウンダストを1個獲得')}
+};
+const colHlOddBefore=hlOdd;hlOdd=function(k){let v=colHlOddBefore(k);if(k==='sm'&&COL_STATE&&!PRAC){const x=colEffects().control;if(x&&v)v=+(v*(1+x)).toFixed(2)}return v};
+
+/* ===== responsive royal design ===== */
+document.head.insertAdjacentHTML('beforeend',`<style>
+#collection,#fragments,#exchange{background:linear-gradient(155deg,#120a0c,#090707);border:1px solid #b89a5866;padding:12px;overflow:hidden}
+.col-nav{display:flex;gap:5px;margin:0 0 12px}.col-nav button{flex:1;font-size:10px;letter-spacing:.08em;padding:9px 4px}
+.col-head{text-align:center;padding:12px 4px 16px;border-bottom:1px solid #b89a5844}.col-head h2{margin:3px 0 7px;font:400 23px Georgia,serif;letter-spacing:.2em;color:#e3cf9a}.col-head p{font:12px/1.7 system-ui,sans-serif;opacity:.72;margin:0}
+.col-wallet{display:grid;grid-template-columns:repeat(3,1fr);gap:6px;margin:12px 0}.col-wallet>div{background:linear-gradient(145deg,#201719,#0c0a0a);border:1px solid #b89a5844;padding:9px 5px;text-align:center;min-width:0}.col-wallet small{display:block;color:#b89a58;font:10px Georgia,serif;letter-spacing:.08em}.col-wallet b{display:block;font:700 17px Georgia,serif;color:#f0dfae;margin-top:3px;overflow-wrap:anywhere}.col-wallet b small{display:inline;font-size:10px}.col-wallet-one{grid-template-columns:1fr}
+.col-banner{display:flex;align-items:center;gap:13px;padding:14px;margin:12px 0;background:radial-gradient(ellipse at 20% 50%,#4b161c,#160a0d 72%);border:1px solid #b89a5888;box-shadow:inset 0 0 24px #000a}.col-banner-mark{font:54px Georgia;color:#d8b25a;text-shadow:0 0 16px #d8b25a88}.col-kicker{font:10px Georgia,serif;letter-spacing:.17em;color:#d8b25a}.col-banner h3{margin:4px 0;font:400 17px Georgia,serif;letter-spacing:.13em;color:#f1e6c9}.col-banner p{margin:0;font:11px/1.5 system-ui,sans-serif;opacity:.75}
+.col-pull-buttons{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin:12px 0}.col-pull-buttons button{margin:0;padding:14px 5px;min-height:62px}.col-pull-buttons button b,.col-pull-buttons button small{display:block}.col-pull-buttons button b{font:700 15px Georgia,serif;letter-spacing:.12em}.col-pull-buttons button small{font:10px Georgia,serif;margin-top:4px;opacity:.78}.col-pull-buttons .col-ten{background:linear-gradient(#f0d98e,#b1802c);box-shadow:0 0 0 1px #f4dc8a,0 4px 12px #0009}
+.col-rates,.col-section{margin:14px 0;padding:12px;background:linear-gradient(145deg,#171214,#0d0b0b);border:1px solid #b89a583b}.col-rates>b{font:13px Georgia,serif;color:#e3cf9a;letter-spacing:.1em}.col-rate-grid{display:grid;grid-template-columns:repeat(5,1fr);gap:4px;margin:9px 0}.col-rate-grid>div{text-align:center;background:#080707;border:1px solid #ffffff12;padding:7px 2px}.col-rate-grid b,.col-rate-grid span{display:block;font-size:12px}.col-rate-grid span{margin-top:3px;color:#eee}.col-rates p,.col-note{font:11px/1.65 system-ui,sans-serif;opacity:.72;margin:7px 0 0}
+.col-section-title{display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid #b89a5844;padding-bottom:8px;margin-bottom:9px}.col-section-title b{font:12px Georgia,serif;letter-spacing:.13em;color:#e3cf9a}.col-section-title span{font:10px system-ui,sans-serif;opacity:.65}
+.col-item{position:relative;display:flex;gap:10px;padding:10px 8px;margin:8px 0;background:linear-gradient(120deg,#1b1717,#0d0b0b);border:1px solid #ffffff20;min-width:0}.col-item-icon{width:48px;height:56px;flex:0 0 48px;display:flex;align-items:center;justify-content:center;background:radial-gradient(#403322,#110e0b);border:1px solid #b89a5855;color:#e3cf9a;font:28px Georgia,serif}.col-item-main{flex:1;min-width:0}.col-item-kicker{font:9px Georgia,serif;letter-spacing:.08em;opacity:.7;margin-bottom:3px}.col-item-main>b{display:block;font:15px Georgia,serif;color:#f0e6ce}.col-item-main p{margin:4px 0;font:11px/1.6 system-ui,sans-serif;opacity:.72}.col-action{margin:6px 3px 0 0;font-size:11px;padding:7px 10px}.col-equipped{position:absolute;right:6px;top:5px;font:9px Georgia,serif;color:#d8b25a;letter-spacing:.09em}.col-frag-effect{display:block;color:#d8c28b;font:10px/1.5 system-ui,sans-serif}.col-cost{font:11px system-ui,sans-serif;margin:6px 0;color:#c9b987}.col-cost b{color:#eddaa0}.col-empty{text-align:center;padding:22px 10px;font:12px/1.8 system-ui,sans-serif;opacity:.6;border:1px dashed #b89a5833}
+.col-r-n{color:#c4c0b8!important}.col-r-r{color:#9dc7d6!important}.col-r-sr{color:#e5c56e!important}.col-r-ssr{color:#db8b91!important}.col-r-ur{color:#f3d36d!important;text-shadow:0 0 9px #d8b25a88}
+.col-r-n.col-item{border-color:#ffffff2a}.col-r-r.col-item{border-color:#8db5c444}.col-r-sr.col-item{border-color:#e0c06b77}.col-r-ssr.col-item{border-color:#b7445088}.col-r-ur.col-item{border-color:#f1d16c;box-shadow:inset 0 0 18px #d8b25a18,0 0 12px #d8b25a22}
+.col-history{display:grid;grid-template-columns:38px 1fr auto;gap:3px 7px;align-items:center;padding:7px 0;border-bottom:1px solid #ffffff12;font:11px system-ui,sans-serif}.col-history>b{font-size:12px}.col-history small{grid-column:2;opacity:.68}.col-history time{grid-column:3;grid-row:1/3;font-size:9px;opacity:.55}
+.col-slots{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:6px;margin:13px 0}.col-slot{min-width:0;padding:9px 4px;text-align:center;background:linear-gradient(150deg,#211719,#0d0a0a);border:1px solid #b89a58aa;display:flex;flex-direction:column;align-items:center;gap:5px}.col-slot small{font:9px Georgia,serif;color:#b89a58;letter-spacing:.12em}.col-slot-symbol{font:27px Georgia;color:#e3cf9a}.col-slot>b{font:11px Georgia,serif;line-height:1.3;overflow-wrap:anywhere}.col-slot>span{font:9px system-ui,sans-serif}.col-slot button{font-size:10px;padding:6px 8px}.col-slot-empty{border-style:dashed;border-color:#b89a5855;opacity:.7}.col-active-effects{display:grid;grid-template-columns:1fr 1fr;gap:6px}.col-active-effects>div{display:flex;justify-content:space-between;gap:8px;background:#07070788;padding:8px;font:10px system-ui,sans-serif}.col-active-effects b{color:#e3cf9a}
+.col-identity{display:inline-flex;align-items:center;gap:8px;padding:6px 10px;background:var(--col-profile-bg);border:1px solid #b89a5888;max-width:100%}.col-profile-icon{font:20px Georgia;color:#e3cf9a}.col-identity b{font:13px Georgia,serif;color:#eee4d0}.col-identity small{display:block;font:10px Georgia,serif;color:#d8b25a;margin-top:2px}.col-identity.col-r-ur{border-color:#f1d16c;box-shadow:0 0 10px #d8b25a55}
+body[data-col-card="cos_card_r"] .pc{border:2px solid #9d2735}body[data-col-card="cos_card_sr"] .pc{border:2px solid #c7a65c}body[data-col-card="cos_card_ssr"] .pc{border:2px solid #a92c38;box-shadow:0 0 0 1px #d8b25a}body[data-col-card="cos_card_ur"] .pc{border:2px solid #e6c76e;box-shadow:0 0 10px #d8b25a66}
+body[data-col-chip="cos_chip_r"] .ch{box-shadow:0 0 0 3px #9d2735 inset,0 3px 6px #000a}body[data-col-chip="cos_chip_sr"] .ch{box-shadow:0 0 0 3px #c7a65c inset,0 3px 6px #000a}body[data-col-chip="cos_chip_ssr"] .ch{box-shadow:0 0 0 4px #a92c38 inset,0 3px 6px #000a}body[data-col-chip="cos_chip_ur"] .ch{box-shadow:0 0 0 4px #e6c76e inset,0 0 12px #d8b25a99}
+.col-reveal-overlay{position:fixed;inset:0;z-index:999;background:radial-gradient(ellipse at center,#3a2020 0,#090607 72%);display:flex;align-items:center;justify-content:center;padding:14px;overflow:auto}.col-reveal-overlay.col-ssr{background:radial-gradient(ellipse at center,#56121c 0,#090607 72%)}.col-reveal-overlay.col-ur{background:radial-gradient(ellipse at center,#7a5520 0,#2b0e15 36%,#050405 78%);animation:colUrBg 2.4s ease both}@keyframes colUrBg{0%{filter:brightness(.3)}35%{filter:brightness(1.6)}100%{filter:brightness(1)}}.col-reveal-stage{position:relative;width:100%;max-width:540px;max-height:92vh;overflow:auto;text-align:center;padding:18px 10px;background:linear-gradient(145deg,#161011,#080707);border:1px solid #d8b25a99;box-shadow:0 0 0 5px #170f0d,0 0 35px #d8b25a44}.col-reveal-brand{font:12px Georgia,serif;letter-spacing:.3em;color:#d8b25a}.col-reveal-line{height:1px;background:linear-gradient(90deg,transparent,#d8b25a,transparent);margin:12px 0}.col-reveal-wait{padding:35px 8px}.col-seal{font:78px Georgia;color:#e3c777;text-shadow:0 0 26px #d8b25a;animation:colSeal 1s ease-in-out infinite alternate}@keyframes colSeal{from{transform:scale(.92);opacity:.65}to{transform:scale(1.05);opacity:1}}.col-reveal-wait b{display:block;font:15px Georgia,serif;letter-spacing:.2em;color:#f2dfac}.col-reveal-wait small{display:block;margin-top:10px;opacity:.7}.col-reveal-title{font:15px Georgia,serif;letter-spacing:.18em;color:#e3cf9a;margin:8px}.col-reveal-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:7px;max-height:58vh;overflow:auto;padding:4px}.col-reward{position:relative;overflow:hidden;min-width:0;background:linear-gradient(150deg,#1e1918,#090808);border:1px solid #b89a5844;padding:11px 5px;animation:colRewardIn .55s var(--delay) both}.col-reward-shine{position:absolute;inset:0;background:linear-gradient(115deg,transparent 30%,#fff2 50%,transparent 70%);transform:translateX(-120%);animation:colShine 1s calc(var(--delay) + .3s) both}@keyframes colShine{to{transform:translateX(120%)}}@keyframes colRewardIn{from{opacity:0;transform:translateY(24px) scale(.9)}to{opacity:1;transform:none}}.col-reward-rarity{font:9px Georgia,serif;letter-spacing:.12em}.col-reward-icon{font:35px Georgia;color:#e4d09a;margin:7px}.col-reward>b{display:block;font:12px Georgia,serif;overflow-wrap:anywhere}.col-reward>small{display:block;font:9px Georgia,serif;opacity:.55;margin:4px}.col-reward>em{display:block;font:9px Georgia,serif;color:#d8b25a;font-style:normal;margin-top:7px}.col-reward>em.col-new{color:#e7e2d4}.col-ur .col-reward.col-r-ur{border:1px solid #f3d36d;box-shadow:0 0 18px #d8b25a66,inset 0 0 22px #d8b25a2a}.col-ur .col-reward.col-r-ur .col-reward-icon{font-size:46px;text-shadow:0 0 18px #f1d16c}.col-reveal-summary{font:11px system-ui,sans-serif;opacity:.75;margin:10px}.col-reveal-content>button{min-width:150px}.col-skip{position:sticky;bottom:0;margin:8px auto 0;background:#1a1312;color:#e3cf9a;border:1px solid #b89a58;padding:8px 22px;box-shadow:none}.col-revealed .col-reveal-stage{animation:colStageIn .4s both}@keyframes colStageIn{from{transform:scale(.96);opacity:.6}to{transform:none;opacity:1}}
+@media(max-width:390px){.col-head h2{font-size:20px}.col-wallet b{font-size:14px}.col-slot{padding:7px 2px}.col-slot>b{font-size:10px}.col-item-icon{width:40px;flex-basis:40px}.col-reveal-grid{gap:5px}}
+</style>`);
+
+/* HTML inline handlers用に操作関数を公開 */
+Object.assign(window,{colPull,colEquipCosmetic,colEquipFragment,colUnequipFragment,colExchange,colSkipReveal,colCloseReveal});
+
+})();
+
+</script>
+</body></html>
