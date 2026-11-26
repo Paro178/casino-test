@@ -724,7 +724,7 @@ async function wPoll(){if(!WP||$('#watch').hidden||!$('#wbox'))return;const[o,st
  $('#wpn').innerHTML=pn+'<div class="c"><button class="s" onclick="wMenu()">一覧へ</button></div>'}
 /* ===== v20: 操作室 拡張（有利／不利補正・払戻率・個人補正・凍結・メンテ・お知らせ・一括操作） ===== */
 Object.assign(DEF,{pay:100,hlb:0,npc:0,cher:15,bmul:3,bgm:8,notice:''});
-const gb=k=>{if(vipOn()){return(k=='slot'||k=='pachi')?(+cfg[k]||0)*0.1:-90}return(+cfg[k]||0)+((cfg.pb&&+cfg.pb[pid])||0)},payOf=w=>{const pm=(cfg.pay==null?100:+cfg.pay)/100,vm=vipOn()?10:1;return w>1?Math.floor(cur*(1+(w-1)*pm*vm)):Math.floor(cur*w)};
+const gb=k=>{if(vipOn()){return(k=='slot'||k=='pachi')?(+cfg[k]||0)*0.1:-90}return(+cfg[k]||0)+((cfg.pb&&+cfg.pb[pid])||0)};let payOf=w=>{const pm=(cfg.pay==null?100:+cfg.pay)/100,vm=vipOn()?10:1;return w>1?Math.floor(cur*(1+(w-1)*pm*vm)):Math.floor(cur*w)};
 function hlDraw(o,k,cr){const b=gb('hlb'),dk=o.dk;if(b&&R(10000)<Math.abs(b)*100){const ok=x=>{const r=rk13(x);return k=='hi'?r>cr:k=='lo'?r<cr:r==cr},ix=dk.map((x,i)=>i).filter(i=>b>0?ok(dk[i]):!ok(dk[i]));if(ix.length)return dk.splice(ix[R(ix.length)],1)[0]}return dk.pop()}
 function xBias(live){const b=gb('bj');if(!live||!b||R(10000)>=Math.abs(b)*100)return;const best=Math.max(0,...X.h.filter(q=>!q.sur&&val(q.c)<=21).map(q=>val(q.c)));if(!best)return;
  const sim=()=>{const h=[...X.d],dk=SH.dk.slice();while(val(h)<17&&dk.length)h.push(dk.pop());return val(h)},good=()=>{const v=sim(),dOk=v<=21&&v>=best;return b>0?!dOk:dOk};
@@ -836,13 +836,13 @@ async function admDel(h){if(!OWNER.includes(me.name))return;const n=PN[h];if(!n)
  const ln=await get('bank/'+h),warn=ln&&ln.st=='active'?'（借入中です）':'';
  if(!confirm(`「${n}」のアカウントを削除します${warn}。\n所持金・履歴・借入・ログインボーナス・宝くじなど、全てのデータが消えて、元に戻せません。よろしいですか？`))return;
  await set('del/'+h,{t:Date.now(),n});
- await Promise.all(['players/'+h,'hist/'+h,'vip/'+h,'bank/'+h,'lb/'+h,'pres/'+h,'live/'+h,'stream/'+h,'lott/'+h,'collection/'+h].map(p=>set(p,null)));
+ await Promise.all(['players/'+h,'hist/'+h,'vip/'+h,'bank/'+h,'lb/'+h,'pres/'+h,'live/'+h,'stream/'+h,'lott/'+h,'ach/'+h,'eq/'+h,'collection/'+h].map(p=>set(p,null)));
  const lots=(await get('lot'))||{};for(const k of Object.keys(lots))if(lots[k]&&lots[k].t&&lots[k].t[h])await set('lot/'+k+'/t/'+h,null);
  const c={...DEF,...((await get('cfg/main'))||{})};if(c.pb)delete c.pb[h];if(c.ban)delete c.ban[h];await set('cfg/main',c);Object.assign(cfg,{pb:c.pb,ban:c.ban});
  toast(`${n} のアカウントを削除しました`);rAdm()}
 var loginT=0,dmiss=0;const _lg5=login_;login_=async function(n){loginT=Date.now();dmiss=0;await _lg5(n)};
 async function delSweep(){if(!me||!DB_URL||Date.now()-loginT<20000)return;try{const d=await (await tmo(fetch(U('players/'+pid)))).json();if(d){dmiss=0;return}if(++dmiss<2)return;
- const m=await (await tmo(fetch(U('del/'+pid)))).json();if(m){toast('このアカウントは削除されました');await Promise.all(['players/'+pid,'hist/'+pid,'vip/'+pid,'collection/'+pid].map(p=>set(p,null)));logout()}}catch(e){}}
+ const m=await (await tmo(fetch(U('del/'+pid)))).json();if(m){toast('このアカウントは削除されました');await Promise.all(['players/'+pid,'hist/'+pid,'vip/'+pid].map(p=>set(p,null)));logout()}}catch(e){}}
 setInterval(delSweep,8000);
 
 /* ===== v22: スロット/パチスロ高難易度化＋GM専用の裏コマンド（残高を5回タップ） ===== */
@@ -876,190 +876,399 @@ const fmtK=a=>a>=1e9?parseFloat((a/1e9).toFixed(2))+'B':a>=1e6?parseFloat((a/1e6
 function allIn(){if(CT=='roul'){if(busy)return;RALL=!RALL;$('#m-roul').className='msg';$('#m-roul').textContent=RALL?'ALL IN：賭けたい場所をタップすると、置ける全額を賭けます（もう一度押すと取り消し）':(rsum()?`BET 合計 ${rsum().toLocaleString()}C`:'チップを置いてください');return}sb(me.money)}
 const _pkA=pick;pick=function(v){RALL=false;_pkA(v)};
 var RLK=false;const _rsA=rlSpin;rlSpin=async function(){if(RLK||busy)return;RLK=true;RALL=false;try{return await _rsA()}finally{RLK=false}};
-</script>
-<script>
-/* ===== ROYAL COLLECTION / FRAGMENT SYSTEM ===== */
-(function(){
+/* ===== 称号システム／ランキング「もっと見る」 ===== */
+const TRR=[{k:'bronze',n:'BRONZE',j:'ブロンズ'},{k:'silver',n:'SILVER',j:'シルバー'},{k:'gold',n:'GOLD',j:'ゴールド'},{k:'plat',n:'PLATINUM',j:'プラチナ'},{k:'cr',n:'CREATOR',j:'創造主'},{k:'gm',n:'GAME MASTER',j:'ゲームマスター'}];
+const ST0=()=>({n:0,w:0,bw:0,cs:0,ms:0,d:0,ld:'',mm:0,b10:0,rs:0,pt:0,rc:''});
+const ISTEST=document.title.includes('テスト');
+let ST=null,UN={},EQ='',TSV=null;
+const TL=[];const AT=(id,r,nm,ds,val,tg)=>TL.push({id,r,nm,ds,val,tg});
+const nf=n=>n.toLocaleString();
+/* ブロンズ：遊べば取れる */
+AT('b1',0,'新参者','はじめて勝負する',s=>s.n,1);
+AT('b2',0,'ギャンブラー','50回遊ぶ',s=>s.n,50);
+AT('b3',0,'勝負師','10回勝つ',s=>s.w,10);
+AT('b4',0,'一攫千金','1回で10,000C以上を払い戻される',s=>s.bw,1e4);
+AT('b5',0,'金の匂い','所持金が100,000Cに到達する',s=>s.mm,1e5);
+AT('b6',0,'夜の常連','3日遊ぶ',s=>s.d,3);
+/* シルバー：しばらく遊ぶと取れる */
+AT('s1',1,'場数の鬼','300回遊ぶ',s=>s.n,300);
+AT('s2',1,'勝利の使徒','100回勝つ',s=>s.w,100);
+AT('s3',1,'豪運の持ち主','1回で200,000C以上を払い戻される',s=>s.bw,2e5);
+AT('s4',1,'黄金の指先','所持金が5,000,000Cに到達する',s=>s.mm,5e6);
+AT('s5',1,'卓の主','14日遊ぶ',s=>s.d,14);
+AT('s6',1,'破竹の五連','5連勝する',s=>s.ms,5);
+AT('s7',1,'一点突破','ルーレットで数字1点賭けを的中させる',s=>s.rs,1);
+/* ゴールド：かなり遊び込むと取れる */
+AT('g1',2,'不夜城の覇者','1,500回遊ぶ',s=>s.n,1500);
+AT('g2',2,'女神に愛されし者','500回勝つ',s=>s.w,500);
+AT('g3',2,'天運の一撃','1回で5,000,000C以上を払い戻される',s=>s.bw,5e6);
+AT('g4',2,'黄金王','所持金が100,000,000Cに到達する',s=>s.mm,1e8);
+AT('g5',2,'不滅の常連','30日遊ぶ',s=>s.d,30);
+AT('g6',2,'八岐の連勝','8連勝する',s=>s.ms,8);
+AT('g7',2,'大勝ちの狩人','払戻10倍以上の大勝ちを30回する',s=>s.b10,30);
+/* プラチナ：ごく一部の人だけ */
+AT('p1',3,'十億の覇王','所持金が1,000,000,000C（10億）に到達する',s=>s.mm,1e9);
+AT('p2',3,'神域の一撃','1回で500,000,000C以上を払い戻される',s=>s.bw,5e8);
+AT('p3',3,'百夜の支配者','100日遊ぶ',s=>s.d,100);
+AT('p4',3,'不敗の怪物','12連勝する',s=>s.ms,12);
+AT('p5',3,'伝説の賭ケグルイ','3,000回勝つ',s=>s.w,3000);
+/* 追加称号（お金持ちシリーズ） */
+const jpN=n=>n>=1e8?+(n/1e8).toFixed(2)+'億':n>=1e4?+(n/1e4).toFixed(1)+'万':String(n);
+const XD={mm:v=>`所持金が${jpN(v)}Cに到達する`,bw:v=>`1回で${jpN(v)}C以上を払い戻される`,w:v=>`${v.toLocaleString()}回勝つ`,n:v=>`${v.toLocaleString()}回遊ぶ`,d:v=>`${v}日遊ぶ`,b10:v=>`払戻10倍以上の大勝ちを${v}回する`,ms:v=>`${v}連勝する`};
+[
+['x1',0,"お年玉の永久機関",'mm',150000],
+['x2',0,"自販機のスポンサー",'bw',20000],
+['x3',0,"100円玉を小銭扱いしない男",'w',15],
+['x4',0,"レシートが長者番付",'n',80],
+['x5',0,"貯金箱が金庫",'d',4],
+['x6',0,"ポイントカードの石油王",'mm',200000],
+['x7',0,"財布の重量オーバー",'bw',30000],
+['x8',0,"財布が重量級",'w',25],
+['x9',0,"億万長者見習い（仮）",'n',120],
+['x10',0,"石油王（自称）",'d',5],
+['x11',0,"税務署公認の富豪（自称）",'mm',300000],
+['x12',0,"小銭を知らない男",'bw',50000],
+['x13',0,"お金が友達",'w',40],
+['x14',0,"金で解決する男",'n',200],
+['x15',0,"課金界の国王",'d',7],
+['x16',0,"資産がインフレ中",'mm',500000],
+['x17',1,"財布にブラックホール",'mm',800000],
+['x18',1,"お会計の概念を壊す者",'bw',300000],
+['x19',1,"残高確認を拒否された男",'w',150],
+['x20',1,"金欠を絶滅させた男",'n',400],
+['x21',1,"金庫を持ち歩く者",'d',10],
+['x22',1,"札束製造機",'ms',6],
+['x23',1,"現金の化身",'mm',1500000],
+['x24',1,"諭吉の飼い主",'bw',500000],
+['x25',1,"歩く国家予算",'w',200],
+['x26',1,"歩く銀行",'n',500],
+['x27',1,"財布の中に国家予算",'d',12],
+['x28',1,"現代の福沢諭吉",'ms',7],
+['x29',1,"ATMの天敵",'mm',3000000],
+['x30',1,"札束の錬金術師",'bw',800000],
+['x31',1,"生まれながらの資産家",'w',250],
+['x32',1,"コンビニを買収した男",'n',700],
+['x33',1,"貯金残高がバグってる",'d',17],
+['x34',1,"金欠という言葉を知らない",'mm',8000000],
+['x35',1,"移動式金融機関",'mm',12000000],
+['x36',1,"歩く高級ブランド",'bw',1500000],
+['x37',1,"お釣りは国家予算へ",'w',300],
+['x38',1,"富豪界の問題児",'n',900],
+['x39',2,"富豪の中の富豪",'mm',150000000],
+['x40',2,"全財産の支配者",'bw',8000000],
+['x41',2,"金のなる木の所有者",'w',600],
+['x42',2,"富豪界の大魔王",'n',2000],
+['x43',2,"ATM界の創造神",'d',40],
+['x44',2,"金銭感覚の最終形態",'b10',40],
+['x45',2,"世界経済の管理人",'ms',9],
+['x46',2,"諭吉王朝の創始者",'mm',200000000],
+['x47',2,"キャッシュの皇帝",'bw',15000000],
+['x48',2,"現金帝国の皇帝",'w',800],
+['x49',2,"金融界の帝王",'n',2500],
+['x50',2,"世界銀行のオーナー",'d',50],
+['x51',2,"金運の化身",'b10',60],
+['x52',2,"諭吉王",'ms',10],
+['x53',2,"万札覇者",'mm',300000000],
+['x54',2,"金庫番長",'bw',30000000],
+['x55',2,"キャッシュ王",'w',1000],
+['x56',2,"財宝卿",'n',3000],
+['x57',2,"億万卿",'d',60],
+['x58',2,"札束卿",'b10',80],
+['x59',2,"富豪の頂点",'mm',400000000],
+['x60',2,"紙幣の支配者",'mm',500000000],
+['x61',2,"諭吉を従える者",'bw',60000000],
+['x62',2,"国家予算級の男",'w',1300],
+['x63',2,"銀行が頭を下げる男",'n',4000],
+['x64',2,"全世界のATM所有者",'d',75],
+['x65',3,"世界経済の黒幕",'mm',1500000000],
+['x66',3,"現金界のラスボス",'bw',600000000],
+['x67',3,"暗黒財閥の総帥",'w',3500],
+['x68',3,"漆黒の黄金王",'d',120],
+['x69',3,"深淵の資産家",'ms',13],
+['x70',3,"禁断の財宝を手にした者",'mm',2000000000],
+['x71',3,"黒金の堕天使",'bw',1000000000],
+['x72',3,"闇市場の帝王",'w',4000],
+['x73',3,"終焉を買い取る者",'d',150],
+['x74',3,"冥界の大富豪",'ms',15],
+['x75',3,"黄金を喰らう魔神",'mm',3000000000],
+['x76',3,"無限札束の悪魔",'bw',2000000000],
+['x77',3,"現金神",'w',5000],
+['x78',3,"富豪神",'d',200],
+['x79',3,"無限残高（アンリミテッド・バランス）",'mm',100000000000]
+].forEach(([id,r,nm,k,v])=>AT(id,r,nm,XD[k](v),s=>s[k]||0,v));
+AT('p6',3,'全てを手にした者','ブロンズとシルバーの称号をすべて獲得する',s=>TL.filter(t=>t.r<2&&UN[t.id]).length,TL.filter(t=>t.r<2).length);
+AT('sp1',4,'創造主','（特別）',s=>0,Infinity);TL[TL.length-1].sp=['ぱろ'];
+AT('sp2',5,'ゲームマスター','（特別）',s=>0,Infinity);TL[TL.length-1].sp=['ぱろ','りゅうが','おかじん'];
+const TM={};TL.forEach(t=>TM[t.id]=t);
+document.head.insertAdjacentHTML('beforeend','<style>.tt{display:inline-block;font:800 13px system-ui,"Hiragino Sans",sans-serif;letter-spacing:.06em;white-space:nowrap;vertical-align:middle}.tt.bronze{color:#e6e1d3}.tt.silver{color:#bcd4f5;text-shadow:0 0 6px #7fb0ff88}.tt.gold{background:linear-gradient(180deg,#fff3a8,#f0b020 60%,#c98a10);-webkit-background-clip:text;background-clip:text;color:transparent;text-shadow:none;filter:drop-shadow(0 0 4px #f5c54299)}.tt.plat{background:linear-gradient(100deg,#7fe9ff,#fff 22%,#e0a8ff 45%,#fff 62%,#7fe9ff 85%);background-size:250% 100%;-webkit-background-clip:text;background-clip:text;color:transparent;animation:ttsh 3s linear infinite;filter:drop-shadow(0 0 5px #9fe3ffdd)}@keyframes ttrb{to{background-position:-300% 0}}@keyframes ttgm{50%{filter:drop-shadow(0 0 3px #ff2d55) drop-shadow(0 0 9px #ff2d55)}}.tt.cr{font-size:14px;font-weight:900;letter-spacing:.12em;background:linear-gradient(100deg,#f0c75e,#fff6d8 25%,#d9a8ff 50%,#7fe0ff 70%,#f0c75e);background-size:250% 100%;-webkit-background-clip:text;background-clip:text;color:transparent;animation:ttsh 3.5s linear infinite;filter:drop-shadow(0 0 3px #fff8) drop-shadow(0 0 7px #f0c75ecc)}.tt.gm{font-weight:900;letter-spacing:.12em;background:linear-gradient(100deg,#ff1f4b,#ff9db0 35%,#ff1f4b 60%,#a3002a);background-size:250% 100%;-webkit-background-clip:text;background-clip:text;color:transparent;animation:ttsh 2.6s linear infinite,ttgm 1.8s ease-in-out infinite;filter:drop-shadow(0 0 5px #ff2d55)}@keyframes ttgm{50%{filter:drop-shadow(0 0 3px #ff2d55) drop-shadow(0 0 9px #ff2d55)}}@keyframes ttsh{to{background-position:-250% 0}}#ttl .tr{display:flex;align-items:center;gap:8px;padding:9px 0;border-bottom:1px solid #fff2}#ttl .tr.lk{opacity:.55}#ttl .tr .ds{font-size:12px;color:#cfc6ab;flex:1;min-width:0}#ttl h5{margin:16px 0 4px;font:400 14px Georgia,serif;letter-spacing:.18em;color:#e3cf9a}#ttl .bar{height:4px;background:#fff2;border-radius:2px;margin-top:4px;overflow:hidden}#ttl .bar i{display:block;height:100%;background:#e8c14a}#ttl .tr button{padding:5px 10px;font-size:12px}</style>');
+const own1=(t,n)=>t.sp?t.sp.includes(n||(me&&me.name)):!!UN[t.id];
+const tvalid=(id,n)=>{const t=TM[id];return !!t&&(!t.sp||t.sp.includes(n))};
+const tchip=id=>{const t=TM[id];return t?`<span class="tt ${TRR[t.r].k}">${t.r==4?'✦ ':t.r==5?'◆ ':''}${E(t.nm)}${t.r==4?' ✦':t.r==5?' ◆':''}</span>`:''};
+function whoR(){if(me)$('#who').innerHTML=(EQ?'<div style="margin-bottom:2px;line-height:1.2">'+tchip(EQ)+'</div>':'')+E(me.name)}
+const today=()=>{const d=new Date();return d.getFullYear()+'-'+(d.getMonth()+1)+'-'+d.getDate()};
+function tSave(){if(!ST||!pid)return;clearTimeout(TSV);const p=pid,s=ST,u=UN;TSV=setTimeout(()=>{if(p==pid)set('ach/'+p,{st:s,un:u})},1200)}
+function tChk(){if(!ST)return;let g=0;TL.forEach(t=>{if(!UN[t.id]&&t.val(ST)>=t.tg){UN[t.id]=Date.now();g++;toast(`称号を獲得：「${t.nm}」（${TRR[t.r].j}）`);if(t.r>=2)snd&&snd(1)}});if(g){tSave();if(CT=='ttl')ttlR()}}
+function tDay(){const d=today();if(ST.ld!=d){ST.ld=d;ST.d++;tSave()}}
+const _fnT=fin;fin=async function(id,w,t){const pay=payOf(w),c=cur;await _fnT(id,w,t);
+ if(PRAC||!ST||!me||c<=0)return;const net=pay-c;ST.n++;tDay();
+ if(net>0){ST.w++;ST.cs++;if(ST.cs>ST.ms)ST.ms=ST.cs}else if(net<0)ST.cs=0;
+ if(net!=0)ST.rc=((net>0?'W':'L')+ST.rc).slice(0,20);if(pay>ST.bw)ST.bw=Math.floor(pay);if(w>=10)ST.b10++;if(id=='roul'&&w>=36)ST.rs++;
+ if(me.money>ST.mm)ST.mm=Math.floor(me.money);tSave();tChk()};
+const _upT=upd;upd=function(){_upT();if(!PRAC&&ST&&me&&me.money>ST.mm){ST.mm=Math.floor(me.money);tSave();tChk()}};
+const _lgT=login_;login_=async function(n){ST=null;UN={};EQ='';await _lgT(n);if(!me)return;
+ let d=null,e=null;try{d=await get('ach/'+pid);e=await get('eq/'+pid)}catch(x){}
+ ST={...ST0(),...((d&&d.st)||{})};UN=(d&&d.un)||{};if(ISTEST&&me.name=='ぱろ')TL.forEach(t=>{if(!t.sp)UN[t.id]=UN[t.id]||Date.now()});EQ=typeof e=='string'&&TM[e]&&own1(TM[e])?e:'';
+ if(me.money>ST.mm)ST.mm=Math.floor(me.money);tDay();whoR();tChk()};
+const _loT=logout;logout=function(){clearTimeout(TSV);if(ST&&pid)set('ach/'+pid,{st:ST,un:UN});ST=null;UN={};EQ='';_loT()};
+/* 称号画面 */
+$('#lobby').insertAdjacentHTML('beforeend',gc('ttl','TITLES','遊んで称号を集めよう。ブロンズ・シルバー・ゴールド・プラチナの4段階。名前の下とランキングに表示できます。','<b style="font:700 20px Georgia,serif;letter-spacing:.1em;color:#e3cf9a">TITLES</b>'));
+$('#lobby').insertAdjacentHTML('afterend','<div class="box" id="ttl" hidden></div>');
+function ttlR(){if(!ST)return;const own=TL.filter(t=>own1(t));
+ $('#ttl').innerHTML=`<div style="display:flex;justify-content:space-between;align-items:center"><b style="letter-spacing:.2em">TITLES</b><button class="s" onclick="tab('lobby')">ロビーへ戻る</button></div><div class="sm" style="margin:8px 0">獲得した称号：${own.length}個　／　いま付けている称号：${EQ?tchip(EQ):'なし'} ${EQ?'<button class="s" style="padding:3px 8px;font-size:12px" onclick="ttlEq(\'\')">外す</button>':''}</div>`+
+ (own.length?[5,4,3,2,1,0].map(ri=>{const a=own.filter(t=>t.r==ri);return a.length?`<h5>${TRR[ri].n}</h5>`+a.map(t=>`<div class="tr"><div style="min-width:130px">${tchip(t.id)}</div><div class="ds">${E(t.ds)}</div>${EQ==t.id?'<b style="color:#e8c14a;font-size:12px">装備中</b>':`<button class="s" onclick="ttlEq('${t.id}')">付ける</button>`}</div>`).join(''):''}).join(''):'<div class="sm" style="margin:16px 0">まだ称号がありません。遊んでいると、どこかで手に入るかもしれません。</div>')}
+async function ttlEq(id){if(id&&!own1(TM[id]))return;EQ=id;await set('eq/'+pid,id||null);whoR();ttlR();toast(id?'称号を付けました':'称号を外しました')}
+const _tT=tab;tab=function(t){const e=$('#ttl');if(t=='ttl'){if(!me||!ST)return;_tT('lobby');$('#lobby').hidden=true;e.hidden=false;ttlR();scrollTo(0,0);return}e.hidden=true;_tT(t)};
+/* ランキング：10位まで表示、「もっと見る」で全員 */
+let RKD=null,RKM=false;
+const rkRow=(l,n,m,id,pf)=>`<div style="display:flex;justify-content:space-between;align-items:center;gap:8px;padding:7px 0;border-bottom:1px solid #fff2"><span style="display:flex;align-items:center;gap:6px;min-width:0">${l} <span style="display:flex;flex-direction:column;min-width:0;line-height:1.25">${id?tchip(id):''}<span${pf!==undefined?` style="text-decoration:underline dotted #b89a58;cursor:pointer" onclick="prof(${pf})"`:''}>${E(n)}</span></span></span><b style="white-space:nowrap">${m}</b></div>`;
+function rkR(){if(!RKD)return;const {gm,ps,eq}=RKD,shown=RKM?ps.slice(0,100):ps.slice(0,10),e=n=>{const i=eq[hex(n)];return tvalid(i,n)?i:''};
+ $('#rank').innerHTML='<b style="letter-spacing:.2em">所持金ランキング</b>'+gm.map(p=>rkRow('<span style="color:#e3cf9a">GM</span>',p.name,'∞ C',e(p.name))).join('')+shown.map((p,i)=>rkRow((i+1)+'.',p.name,Math.floor(p.money).toLocaleString()+' C',e(p.name),i<10?i:undefined)).join('')+
+ (ps.length>10?`<div class="c" style="margin-top:10px"><button class="s" onclick="RKM=!RKM;rkR()">${RKM?'閉じる（10位まで）':`もっと見る（全${Math.min(ps.length,100)}位まで）`}</button></div>`:'')+'<div class="sm c" style="margin-top:8px">10位までの名前を押すとプロフィールが見られます</div>'}
+rk=async function(){const all=await list(),isg=p=>OWNER.includes(p.name)||SUBA.includes(p.name),
+ gm=all.filter(isg).sort((a,b)=>(OWNER.includes(a.name)?0:1)-(OWNER.includes(b.name)?0:1)),ps=all.filter(p=>!isg(p)).sort((a,b)=>b.money-a.money);
+ let eq={};try{eq=(await get('eq'))||{}}catch(x){}if(me&&pid)eq[pid]=EQ||null;RKD={gm,ps,eq};RKM=false;rkR()};
+
+
+/* プレイ時間（画面を開いている時間） */
+setInterval(()=>{if(ST&&me&&!PRAC&&document.visibilityState=='visible'){ST.pt=(ST.pt||0)+15;if(ST.pt%60==0)tSave()}},15000);
+const fmtT=t=>{t=Math.floor(t||0);const h=Math.floor(t/3600),m=Math.floor(t%3600/60);return h?`${h}時間${m}分`:`${m}分`};
+document.head.insertAdjacentHTML('beforeend','<style>#prof{position:fixed;inset:0;background:#000b;z-index:9999;display:flex;align-items:center;justify-content:center;padding:16px}#prof .pfc{background:#14110d;border:1px solid #b89a58;border-radius:10px;padding:18px;width:100%;max-width:340px;box-shadow:0 8px 30px #000}#prof .pr{display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid #fff2;font-size:14px}#prof .dt{display:inline-block;width:11px;height:11px;border-radius:50%;margin:1px}</style>');
+async function prof(i){const p=RKD&&RKD.ps[i];if(!p)return;let d=null;try{d=await get('ach/'+hex(p.name))}catch(x){}
+ if(me&&p.name==me.name&&ST)d={st:ST};const s=(d&&d.st)||null,eq=RKD.eq[hex(p.name)],rc=(s&&s.rc)||'',w=[...rc].filter(c=>c=='W').length,
+ old=document.getElementById('prof');if(old)old.remove();
+ document.body.insertAdjacentHTML('beforeend',`<div id="prof" onclick="if(event.target==this)this.remove()"><div class="pfc"><div class="c" style="margin-bottom:10px">${tvalid(eq,p.name)?'<div>'+tchip(eq)+'</div>':''}<b style="font-size:20px">${E(p.name)}</b><div class="sm">${i+1}位 ・ ${Math.floor(p.money).toLocaleString()} C</div></div>
+ <div class="pr"><span>累計プレイ時間</span><b>${s&&s.pt?fmtT(s.pt):'記録なし'}</b></div>
+ <div class="pr"><span>直近${rc.length||20}ゲームの勝率</span><b>${rc.length?Math.round(w/rc.length*100)+'%（'+w+'勝'+(rc.length-w)+'敗）':'記録なし'}</b></div>
+ ${rc.length?'<div style="padding:8px 0;line-height:1">'+[...rc].map(c=>`<span class="dt" style="background:${c=='W'?'#3ecf74':'#d6443c'}"></span>`).join('')+'<div class="sm" style="margin-top:4px">左が最新（緑＝勝ち／赤＝負け）</div></div>':''}
+ <div class="pr"><span>通算プレイ数</span><b>${s&&s.n?s.n.toLocaleString()+'回':'記録なし'}</b></div>
+ <div class="c" style="margin-top:12px"><button class="s" onclick="document.getElementById('prof').remove()">閉じる</button></div></div></div>`)}
+</script><script>
+/* ===== ROYAL COLLECTION + PROFILE EDITOR ===== */
+(()=>{
 'use strict';
-
-const COL_RARITIES=['N','R','SR','SSR','UR'];
-const COL_RATES={N:58,R:27,SR:10,SSR:4,UR:1}; // 合計100%。この定数を変更すると排出率を調整できます。
-const COL_DUST_DUP={N:20,R:45,SR:110,SSR:280,UR:700};
-const COL_DUST_COST={N:80,R:200,SR:550,SSR:1400,UR:3500};
-const COL_FRAGMENT_RATE={N:.005,R:.008,SR:.012,SSR:.016,UR:.020};
-const COL_SOLO_GAMES=['slot','pachi','roul','bj','pk','hl'];
-const COL_GAME_NAMES={slot:'スロット',pachi:'パチスロ',roul:'ルーレット',bj:'ブラックジャック',pk:'ビデオポーカー',hl:'ハイ＆ロー'};
-const COL_COSMETIC_SEEDS=[
- {type:'plate',label:'ネームプレート',names:['エメラルド・ライン','ルビー・フレーム','ゴールド・エングレーブ','ブラック・ロイヤル','エンペラーズ・シグネット'],icons:['♧','♦','♛','♜','♕'],desc:['深緑の細い装飾を施したプレート','深紅と銀の縁取り','金の彫刻をあしらったプレート','黒曜石と金の重厚な額縁','皇帝の紋章を刻んだ特別仕様']},
- {type:'bg',label:'プロフィール背景',names:['ベルベット・グリーン','クリムゾン・サロン','ミッドナイト・ゴールド','ロイヤル・サロン','インペリアル・ホール'],icons:['▰','◈','✦','♜','♛'],desc:['深緑のベルベットを思わせる背景','深い赤のサロンをイメージ','夜のサロンに金の光が差す背景','王室のホールを描いた背景','皇帝の間をイメージした限定背景']},
- {type:'icon',label:'プレイヤーアイコン',names:['スペード','ルビー','クラウン','ダイヤモンド・キング','フェニックス'],icons:['♠','♦','♛','💎','♜'],desc:['クラシックなスペードの紋章','深紅の宝石','王冠のエンブレム','王室のダイヤモンド','伝説の不死鳥を象った紋章']},
- {type:'card',label:'カードデザイン',names:['アイボリー','クリムゾン・エッジ','マーブル・ゴールド','ロイヤル・デッキ','エンパイア・デッキ'],icons:['▤','▤','▤','▤','▤'],desc:['アイボリーを基調にしたカード','深紅の縁取りを持つデザイン','大理石と金箔のデザイン','王室仕様のカードデザイン','最高位の意匠を施したデッキ']},
- {type:'chip',label:'チップデザイン',names:['クラシック・チップ','ゴールド・リング','ブラックゴールド','ロイヤル・チップ','エンパイア・チップ'],icons:['◉','◉','◉','◉','◉'],desc:['伝統的なカジノチップ','金色のリングを刻んだチップ','黒と金の重厚なチップ','王室の紋章入りチップ','帝国の紋章を刻んだ特別チップ']},
- {type:'title',label:'特別な称号',names:['サロンの新星','テーブルの名手','ゴールド・ハイローラー','ロイヤル・エース','伝説の支配人'],icons:['✧','♠','♛','♕','★'],desc:['サロンに現れた期待の新人','テーブルを知り尽くした者','黄金の名を持つプレイヤー','王室に認められたエース','伝説として名を残す者']}
+const RC_ITEMS=[
+ // Fragments: R / SR / SSR / UR tiers
+ {id:'f_luck_r',type:'fragment',cat:'LUCK',rarity:'R',name:'星巡りの欠片',desc:'敗北時、1日1回だけ25%の救済抽選（2%）',effect:{luck:0.02}},
+ {id:'f_luck_sr',type:'fragment',cat:'LUCK',rarity:'SR',name:'流星の欠片',desc:'敗北時、1日1回だけ25%の救済抽選（3%）',effect:{luck:0.03}},
+ {id:'f_luck_ssr',type:'fragment',cat:'LUCK',rarity:'SSR',name:'天運の欠片',desc:'敗北時、1日1回だけ25%の救済抽選（4%）',effect:{luck:0.04}},
+ {id:'f_luck_ur',type:'fragment',cat:'LUCK',rarity:'UR',name:'運命を導く欠片',desc:'敗北時、1日1回だけ25%の救済抽選（5%）',effect:{luck:0.05}},
+ {id:'f_fortune_r',type:'fragment',cat:'FORTUNE',rarity:'R',name:'黄金の欠片',desc:'勝利時、利益を1%増加',effect:{fortune:0.01}},
+ {id:'f_fortune_sr',type:'fragment',cat:'FORTUNE',rarity:'SR',name:'王金の欠片',desc:'勝利時、利益を2%増加',effect:{fortune:0.02}},
+ {id:'f_fortune_ssr',type:'fragment',cat:'FORTUNE',rarity:'SSR',name:'富豪の欠片',desc:'勝利時、利益を3%増加',effect:{fortune:0.03}},
+ {id:'f_fortune_ur',type:'fragment',cat:'FORTUNE',rarity:'UR',name:'王家の財宝片',desc:'勝利時、利益を4%増加',effect:{fortune:0.04}},
+ {id:'f_defense_r',type:'fragment',cat:'DEFENSE',rarity:'R',name:'護りの欠片',desc:'完全敗北時、賭け金の1%を返還',effect:{defense:0.01}},
+ {id:'f_defense_sr',type:'fragment',cat:'DEFENSE',rarity:'SR',name:'守護の欠片',desc:'完全敗北時、賭け金の2%を返還',effect:{defense:0.02}},
+ {id:'f_defense_ssr',type:'fragment',cat:'DEFENSE',rarity:'SSR',name:'不落の欠片',desc:'完全敗北時、賭け金の3%を返還',effect:{defense:0.03}},
+ {id:'f_defense_ur',type:'fragment',cat:'DEFENSE',rarity:'UR',name:'王城の守護片',desc:'完全敗北時、賭け金の4%を返還',effect:{defense:0.04}},
+ {id:'f_control_r',type:'fragment',cat:'CONTROL',rarity:'R',name:'采配の欠片',desc:'スロット・パチスロ・ルーレット・BJの有利補正 +0.5ポイント',effect:{control:0.5}},
+ {id:'f_control_sr',type:'fragment',cat:'CONTROL',rarity:'SR',name:'戦略の欠片',desc:'スロット・パチスロ・ルーレット・BJの有利補正 +0.75ポイント',effect:{control:0.75}},
+ {id:'f_control_ssr',type:'fragment',cat:'CONTROL',rarity:'SSR',name:'王者の采配片',desc:'スロット・パチスロ・ルーレット・BJの有利補正 +1ポイント',effect:{control:1}},
+ {id:'f_control_ur',type:'fragment',cat:'CONTROL',rarity:'UR',name:'運命支配の欠片',desc:'スロット・パチスロ・ルーレット・BJの有利補正 +1.25ポイント',effect:{control:1.25}},
+ {id:'f_special_r',type:'fragment',cat:'SPECIAL',rarity:'R',name:'祝福の欠片',desc:'勝利時、交換素材を2%で1個獲得',effect:{special:0.02,dust:1}},
+ {id:'f_special_sr',type:'fragment',cat:'SPECIAL',rarity:'SR',name:'祝祭の欠片',desc:'勝利時、交換素材を3%で2個獲得',effect:{special:0.03,dust:2}},
+ {id:'f_special_ssr',type:'fragment',cat:'SPECIAL',rarity:'SSR',name:'至福の欠片',desc:'勝利時、交換素材を4%で3個獲得',effect:{special:0.04,dust:3}},
+ {id:'f_special_ur',type:'fragment',cat:'SPECIAL',rarity:'UR',name:'王の祝福片',desc:'勝利時、交換素材を5%で4個獲得',effect:{special:0.05,dust:4}},
+ // Nameplates only
+ {id:'p_n_brass',type:'plate',rarity:'N',name:'ブラス・エンブレム',desc:'落ち着いた真鍮のプレート',theme:'brass'},
+ {id:'p_n_crest',type:'plate',rarity:'N',name:'クラシック・クレスト',desc:'クラシックな紋章プレート',theme:'crest'},
+ {id:'p_r_crimson',type:'plate',rarity:'R',name:'クリムゾン・ロイヤル',desc:'深紅と金のロイヤルプレート',theme:'crimson'},
+ {id:'p_r_emerald',type:'plate',rarity:'R',name:'エメラルド・ホール',desc:'深緑の上質なプレート',theme:'emerald'},
+ {id:'p_sr_sapphire',type:'plate',rarity:'SR',name:'サファイア・ナイト',desc:'青い宝石をあしらったプレート',theme:'sapphire'},
+ {id:'p_sr_amethyst',type:'plate',rarity:'SR',name:'アメジスト・ヴェール',desc:'紫の光沢をまとったプレート',theme:'amethyst'},
+ {id:'p_ssr_imperial',type:'plate',rarity:'SSR',name:'インペリアル・ゴールド',desc:'王室を思わせる金のプレート',theme:'imperial'},
+ {id:'p_ssr_noir',type:'plate',rarity:'SSR',name:'ノワール・ダイヤ',desc:'黒曜石と金のプレート',theme:'noir'},
+ {id:'p_ur_crown',type:'plate',rarity:'UR',name:'グランド・クラウン',desc:'王冠の意匠を刻んだ最上位プレート',theme:'crown'},
+ {id:'p_ur_royal',type:'plate',rarity:'UR',name:'ロイヤル・レガリア',desc:'ロイヤルカジノの特別な紋章',theme:'regalia'}
 ];
-const COL_FRAGMENT_SEEDS=[
- {type:'fragment',category:'LUCK',names:['運命のコイン','四つ葉の護符','星読みの水晶','女神のルーレット','天運の王冠'],icons:['◉','♣','✧','☼','♛']},
- {type:'fragment',category:'FORTUNE',names:['黄金の残響','富の紋章','金庫の鍵','王室の祝福','エンペラーズ・レガシー'],icons:['◈','♜','⚿','♕','♛']},
- {type:'fragment',category:'CONTROL',names:['カード・リーダー','確率の羅針盤','ディーラーの眼','運命の支配者','ロイヤル・コントロール'],icons:['♠','⌖','◎','♜','♛']},
- {type:'fragment',category:'DEFENSE',names:['銀の盾','守護の紋章','不落の城壁','王の防壁','絶対防護の王冠'],icons:['⬡','⛨','▥','♜','♛']},
- {type:'fragment',category:'SPECIAL',names:['小さな王冠','星屑の欠片','幸運の残光','幻のトランプ','神話の王冠'],icons:['♛','✦','☄','♠','♕']}
-];
-const COL_RARITY_DESC={N:'NORMAL',R:'RARE',SR:'SUPER RARE',SSR:'DOUBLE SUPER RARE',UR:'ULTRA RARE'};
-const COL_ITEMS=[];
-COL_COSMETIC_SEEDS.forEach(seed=>seed.names.forEach((name,i)=>{
- const rarity=COL_RARITIES[i],id=`cos_${seed.type}_${rarity.toLowerCase()}`;
- COL_ITEMS.push({id,type:seed.type,slot:seed.type,label:seed.label,name,rarity,icon:seed.icons[i],desc:seed.desc[i]});
-}));
-COL_FRAGMENT_SEEDS.forEach(seed=>seed.names.forEach((name,i)=>{
- const rarity=COL_RARITIES[i],rate=COL_FRAGMENT_RATE[rarity],id=`frag_${seed.category.toLowerCase()}_${rarity.toLowerCase()}`;
- COL_ITEMS.push({id,type:'fragment',category:seed.category,name,rarity,icon:seed.icons[i],rate,desc:colFragmentDesc(seed.category,rate)});
-}));
-function colFragmentDesc(category,rate){
- const p=(rate*100).toFixed(1).replace(/\.0$/,'');
- if(category==='LUCK')return `対象ゲームで負けたとき、${p}%の確率でその回を引き分け扱いにします。成功は1日1回まで。`;
- if(category==='FORTUNE')return `対象ゲームで払戻が賭け金を上回った場合、利益部分を${p}%上乗せします。`;
- if(category==='CONTROL')return `HIGH & LOWで「SAME」を選んで同じ数字が出たとき、連勝ポットの倍率を${p}%上乗せします。`;
- if(category==='DEFENSE')return `対象ゲームで負けた場合、賭け金の${p}%を返還します。`;
- return `対象ゲームで勝ったとき、${p}%の確率で交換素材「クラウンダスト」を1個獲得します。`;
+const RC_BY_ID=Object.fromEntries(RC_ITEMS.map(x=>[x.id,x]));
+const RC_RANK={N:0,R:1,SR:2,SSR:3,UR:4};
+const RC_DUST={N:5,R:15,SR:40,SSR:100,UR:250};
+let RC_DATA=null,RC_VIEW='gacha',RC_BUSY=false,RC_SKIP=false,RC_CFG_SNAPSHOT=null;
+const RC_GAME_IDS=['slot','pachi','roul','bj','pk','hl'];
+const RC_JST=()=>{try{return new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Tokyo',year:'numeric',month:'2-digit',day:'2-digit'}).format(new Date())}catch(e){return new Date().toISOString().slice(0,10)}};
+const RC_DEFAULT=()=>({v:1,pulls:0,pity:0,dust:0,owned:[],equipped:[null,null,null],equippedPlate:null,luckUsed:'',history:[]});
+function rcNormalize(d){const x={...RC_DEFAULT(),...(d&&typeof d==='object'?d:{})};x.pulls=Math.max(0,Math.floor(+x.pulls||0));x.pity=Math.max(0,Math.min(99,Math.floor(+x.pity||0)));x.dust=Math.max(0,Math.floor(+x.dust||0));x.owned=[...new Set((Array.isArray(x.owned)?x.owned:[]).filter(id=>RC_BY_ID[id]))];x.equipped=(Array.isArray(x.equipped)?x.equipped:[]).slice(0,3);while(x.equipped.length<3)x.equipped.push(null);x.equipped=x.equipped.map(id=>id&&RC_BY_ID[id]&&RC_BY_ID[id].type==='fragment'&&x.owned.includes(id)?id:null);x.equippedPlate=x.equippedPlate&&RC_BY_ID[x.equippedPlate]&&RC_BY_ID[x.equippedPlate].type==='plate'&&x.owned.includes(x.equippedPlate)?x.equippedPlate:null;x.history=Array.isArray(x.history)?x.history.slice(0,60):[];return x}
+async function rcSave(){if(!RC_DATA||!pid)return;await set('collection/'+pid,RC_DATA)}
+function rcItem(id){return RC_BY_ID[id]||null}
+function rcOwned(type){return (RC_DATA?.owned||[]).map(rcItem).filter(x=>x&&(!type||x.type===type))}
+function rcEffects(){return (RC_DATA?.equipped||[]).map(rcItem).filter(x=>x&&x.type==='fragment')}
+function rcSum(key,cap=1){return Math.min(cap,rcEffects().reduce((a,x)=>a+(+((x.effect||{})[key])||0),0))}
+function rcRarityClass(r){return 'rc-r-'+String(r||'N').toLowerCase()}
+function rcPlateName(name,id){const x=rcItem(id);return x&&x.type==='plate'?`<span class="rc-nameplate rc-theme-${x.theme}"><i>♛</i><b>${E(name)}</b><em>ROYAL CASINO</em></span>`:`<span class="rc-nameplate rc-theme-default"><i>♛</i><b>${E(name)}</b><em>ROYAL CASINO</em></span>`}
+function rcRefreshWho(){if(!me)return;const title=typeof EQ!=='undefined'&&EQ?tchip(EQ):'';$('#who').innerHTML=(title?`<div style="margin-bottom:3px;line-height:1.2">${title}</div>`:'')+`<div class="rc-who-name">${rcPlateName(me.name,RC_DATA&&RC_DATA.equippedPlate)}</div>`}
+function rcCard(x,extra=''){return `<div class="rc-item ${rcRarityClass(x.rarity)} ${extra}"><div class="rc-item-top"><span>${x.type==='fragment'?'FRAGMENT':'NAMEPLATE'}</span><b>${x.rarity}</b></div><div class="rc-item-icon">${x.type==='fragment'?'✧':'♛'}</div><div class="rc-item-name">${E(x.name)}</div><div class="rc-item-desc">${E(x.desc||'')}</div></div>`}
+function rcPool(r){return RC_ITEMS.filter(x=>x.rarity===r)}
+function rcRandom(a){return a[Math.floor(Math.random()*a.length)]}
+function rcDrawOne(){let r;RC_DATA.pulls++;RC_DATA.pity++;
+ if(RC_DATA.pity>=100){r='UR';RC_DATA.pity=0}else{const n=Math.random()*100;r=n<2?'UR':n<7?'SSR':n<19?'SR':n<45?'R':'N';if(r==='UR')RC_DATA.pity=0}
+ return rcRandom(rcPool(r))}
+function rcProcessDraws(n){const arr=Array.from({length:n},()=>rcDrawOne());let guaranteed=false;if(n===10&&!arr.some(x=>RC_RANK[x.rarity]>=1)){arr[9]=rcRandom(rcPool('R'));guaranteed=true}
+ return arr.map((x,i)=>{const dup=RC_DATA.owned.includes(x.id),dust=dup?RC_DUST[x.rarity]:0;if(dup)RC_DATA.dust+=dust;else RC_DATA.owned.push(x.id);const h={id:x.id,rarity:x.rarity,time:Date.now(),dup,dust,guaranteed:!!(guaranteed&&i===9)};RC_DATA.history.unshift(h);return {...x,dup,dust,guaranteed:h.guaranteed}})}
+function rcRevealSkip(){RC_SKIP=true}
+window.rcRevealSkip=rcRevealSkip;
+async function rcReveal(items){RC_SKIP=false;const o=document.createElement('div');o.id='rc-reveal';o.innerHTML=`<div class="rc-curtain rc-left"></div><div class="rc-curtain rc-right"></div><div class="rc-reveal-inner"><div class="rc-reveal-kicker">ROYAL CASINO PRESENTS</div><div class="rc-reveal-title">ROYAL COLLECTION</div><div class="rc-seal" id="rc-seal">♛</div><div class="rc-reveal-sub">THE SEAL IS BREAKING</div><div class="rc-reveal-grid" id="rc-reveal-grid"></div><button class="rc-skip" onclick="rcRevealSkip()">演出をスキップ</button></div>`;document.body.append(o);
+ const wait=async ms=>{const end=Date.now()+ms;while(Date.now()<end&&!RC_SKIP)await new Promise(r=>setTimeout(r,35))};
+ try{if(typeof tone==='function'){tone(110,.45,0,'sawtooth',.06);tone(220,.6,.2,'triangle',.08)}await wait(650);o.classList.add('rc-open');await wait(550);const seal=o.querySelector('#rc-seal');if(seal)seal.classList.add('rc-seal-open');await wait(400);
+ const grid=o.querySelector('#rc-reveal-grid');for(let i=0;i<items.length&&!RC_SKIP;i++){const x=items[i],card=document.createElement('div');card.className='rc-revealed '+rcRarityClass(x.rarity);card.innerHTML=`<div class="rc-revealed-rarity">${x.rarity}${x.guaranteed?' · GUARANTEED':''}</div><div class="rc-revealed-icon">${x.type==='fragment'?'✧':'♛'}</div><b>${E(x.name)}</b><small>${x.type==='fragment'?'効果付きフラグメント':'ネームプレート'}</small>${x.dup?`<em>重複 +${x.dust} DUST</em>`:'<em>NEW ITEM</em>'}`;grid.append(card);card.classList.add('rc-card-in');if(typeof tone==='function')tone(x.rarity==='UR'?1040:x.rarity==='SSR'?820:x.rarity==='SR'?660:480,.18,0,'triangle',.07);await wait(x.rarity==='UR'?900:x.rarity==='SSR'?650:430)}
+ if(RC_SKIP){grid.innerHTML=items.map(x=>`<div class="rc-revealed ${rcRarityClass(x.rarity)}"><div class="rc-revealed-rarity">${x.rarity}</div><div class="rc-revealed-icon">${x.type==='fragment'?'✧':'♛'}</div><b>${E(x.name)}</b><small>${x.type==='fragment'?'効果付きフラグメント':'ネームプレート'}</small>${x.dup?`<em>重複 +${x.dust} DUST</em>`:'<em>NEW ITEM</em>'}</div>`).join('')}
+ const skip=o.querySelector('.rc-skip');skip.textContent='結果を閉じる';skip.onclick=()=>o.remove();RC_SKIP=false;await wait(1800);if(o.isConnected)o.remove();
+ }catch(e){if(o.isConnected)o.remove();throw e}}
+async function rcPull(n){if(RC_BUSY)return;if(!me||!RC_DATA)return toast('ログインしてください');if(typeof PRAC!=='undefined'&&PRAC)return toast('練習モード中はガチャを利用できません');if(busy)return toast('ゲーム終了後にガチャを引いてください');RC_BUSY=true;try{await sync();const cost=n===10?900:100;if(me.money<cost){toast('Cが不足しています');return}await add(-cost);const res=rcProcessDraws(n);RC_DATA.history=RC_DATA.history.slice(0,60);await rcSave();rcRender();await rcReveal(res);rcRender();rcRefreshWho()}catch(e){console.error(e);toast('ガチャ処理に失敗しました')}finally{RC_BUSY=false;rcRender()}}
+window.rcPull=rcPull;
+function rcSetView(v){RC_VIEW=v;rcRender()}
+window.rcSetView=rcSetView;
+function rcEquipFragment(id){const x=rcItem(id);if(!x||x.type!=='fragment'||!RC_DATA.owned.includes(id))return;if(RC_DATA.equipped.includes(id))return toast('そのフラグメントは装備済みです');const i=RC_DATA.equipped.findIndex(v=>!v);if(i<0)return toast('装備枠が3つ埋まっています。先に外してください');RC_DATA.equipped[i]=id;rcSave();rcRender();toast(`${x.name} を${i+1}番枠に装備しました`)}
+function rcUnequipFragment(i){if(!RC_DATA)return;RC_DATA.equipped[i]=null;rcSave();rcRender();toast(`${i+1}番枠を外しました`)}
+function rcEquipPlate(id){if(id&&!RC_DATA.owned.includes(id))return;const x=rcItem(id);if(id&&(!x||x.type!=='plate'))return;RC_DATA.equippedPlate=id||null;rcSave();rcRefreshWho();rcRender();toast(id?'ネームプレートを変更しました':'ネームプレートを外しました')}
+window.rcEquipFragment=rcEquipFragment;window.rcUnequipFragment=rcUnequipFragment;window.rcEquipPlate=rcEquipPlate;
+function rcExchange(id){const x=rcItem(id);if(!x||RC_DATA.owned.includes(id))return;const costs={R:120,SR:350,SSR:900,UR:2200},cost=costs[x.rarity];if(!cost)return;if(RC_DATA.dust<cost)return toast('交換素材が不足しています');if(!confirm(`${x.name} を ${cost} DUST で交換しますか？`))return;RC_DATA.dust-=cost;RC_DATA.owned.push(id);rcSave();rcRender();toast(`${x.name} を交換しました`)}
+window.rcExchange=rcExchange;
+function rcRender(){const e=$('#collection');if(!e||!RC_DATA)return;const bal=me?Math.floor(me.money).toLocaleString():'0',frag=rcOwned('fragment'),plates=rcOwned('plate');let body='';
+ if(RC_VIEW==='gacha')body=`<div class="rc-gacha-hero"><div class="rc-hero-crown">♛</div><div class="rc-hero-small">THE GRAND SALON · EXCLUSIVE DRAW</div><h2>ROYAL COLLECTION</h2><p>運命を引き当てる。手に入るのはフラグメントとネームプレートのみ。</p><div class="rc-hero-rates"><span>UR 2%</span><span>SSR 5%</span><span>SR 12%</span><span>R 26%</span><span>N 55%</span></div></div><div class="rc-pull-actions"><button onclick="rcPull(1)" ${RC_BUSY?'disabled':''}><b>SINGLE DRAW</b><small>1回 · 100 C</small></button><button onclick="rcPull(10)" ${RC_BUSY?'disabled':''}><b>10 DRAWS</b><small>10連 · 900 C</small></button></div><div class="rc-note">10連はR以上1個確定。URは最大100回以内に1回確定。確率は各抽選ごとに独立し、重複アイテムはDUSTに変換されます。</div><div class="rc-statline"><span>累計 ${RC_DATA.pulls.toLocaleString()}回</span><span>UR確定まで ${100-RC_DATA.pity}回</span><span>${RC_DATA.dust.toLocaleString()} DUST</span></div><h3 class="rc-section-title">RECENT PULLS</h3><div class="rc-history-mini">${RC_DATA.history.slice(0,5).map(h=>{const x=rcItem(h.id);return x?`<span class="${rcRarityClass(x.rarity)}">${E(x.name)}${h.dup?' · DUP':''}</span>`:''}).join('')||'<small>まだ履歴がありません</small>'}</div>`;
+ else if(RC_VIEW==='fragments')body=`<div class="rc-statline"><span>所持 ${frag.length}種</span><span>装備 ${RC_DATA.equipped.filter(Boolean).length}/3</span></div><div class="rc-equip-grid">${[0,1,2].map(i=>{const x=rcItem(RC_DATA.equipped[i]);return `<div class="rc-slot"><small>FRAGMENT SLOT ${i+1}</small>${x?`<b>${E(x.name)}</b><span>${E(x.desc)}</span><button class="s" onclick="rcUnequipFragment(${i})">外す</button>`:'<b class="rc-empty">EMPTY</b><span>フラグメントを装備できます</span>'}</div>`}).join('')}</div><h3 class="rc-section-title">OWNED FRAGMENTS</h3>${frag.length?`<div class="rc-owned-grid">${frag.map(x=>`<div class="rc-owned-cell">${rcCard(x)}<button class="s rc-equip-btn" onclick="rcEquipFragment('${x.id}')" ${RC_DATA.equipped.includes(x.id)?'disabled':''}>${RC_DATA.equipped.includes(x.id)?'装備中':'空き枠に装備'}</button></div>`).join('')}</div>`:'<div class="rc-empty-note">フラグメントはまだありません。ガチャで獲得できます。</div>'}<div class="rc-note">装備できるのは最大3個。効果はソロゲームに適用されます。確率補正や払戻補正には上限があります。</div>`;
+ else if(RC_VIEW==='plates')body=`<div class="rc-equipped-plate"><small>NOW EQUIPPED</small>${RC_DATA.equippedPlate?rcPlateName(me.name,RC_DATA.equippedPlate):`<span class="rc-nameplate rc-theme-default">${E(me.name)}</span>`}</div><h3 class="rc-section-title">OWNED NAMEPLATES</h3>${plates.length?`<div class="rc-owned-grid">${plates.map(x=>`<div class="rc-owned-cell">${rcCard(x)}<button class="s rc-equip-btn" onclick="rcEquipPlate('${x.id}')" ${RC_DATA.equippedPlate===x.id?'disabled':''}>${RC_DATA.equippedPlate===x.id?'装備中':'装備する'}</button></div>`).join('')}</div>`:'<div class="rc-empty-note">ネームプレートはまだありません。ガチャで獲得できます。</div>'}<div class="rc-note">装備したネームプレートはロビーの自分の名前とプロフィールに表示されます。</div>`;
+ else if(RC_VIEW==='exchange'){const avail=RC_ITEMS.filter(x=>!RC_DATA.owned.includes(x.id)&&x.rarity!=='N');const costs={R:120,SR:350,SSR:900,UR:2200};body=`<div class="rc-statline"><span>交換素材</span><b>${RC_DATA.dust.toLocaleString()} DUST</b></div><div class="rc-note">重複アイテムから手に入るDUSTで、未所持アイテムを選んで交換できます。</div>${avail.length?`<div class="rc-owned-grid">${avail.map(x=>`<div class="rc-owned-cell">${rcCard(x)}<button class="s rc-equip-btn" onclick="rcExchange('${x.id}')" ${RC_DATA.dust<(costs[x.rarity]||999999)?'disabled':''}>${costs[x.rarity]} DUSTで交換</button></div>`).join('')}</div>`:'<div class="rc-empty-note">交換できる未所持アイテムはありません。</div>'}`}
+ else if(RC_VIEW==='history')body=`<h3 class="rc-section-title">PULL HISTORY</h3>${RC_DATA.history.length?`<div class="rc-history-list">${RC_DATA.history.slice(0,30).map(h=>{const x=rcItem(h.id);return x?`<div><span class="${rcRarityClass(x.rarity)}">${x.rarity}</span><b>${E(x.name)}</b><small>${new Date(h.time).toLocaleString('ja-JP')} ${h.dup?`／重複 +${h.dust} DUST`:'／NEW'}${h.guaranteed?'／10連保証':''}</small></div>`:''}).join('')}</div>`:'<div class="rc-empty-note">履歴はまだありません。</div>'}`;
+ e.innerHTML=`<div class="rc-page-head"><div><div class="rc-eyebrow">THE ROYAL VAULT</div><h2>ROYAL COLLECTION</h2></div><button class="s" onclick="tab('lobby')">ロビーへ戻る</button></div><div class="rc-wallet"><span>YOUR CREDIT</span><b>${bal} C</b><span>DUST ${RC_DATA.dust.toLocaleString()}</span></div><div class="rc-tabs">${[['gacha','ガチャ'],['fragments','フラグメント'],['plates','ネームプレート'],['exchange','交換所'],['history','履歴']].map(([k,t])=>`<button class="s ${RC_VIEW===k?'active':''}" onclick="rcSetView('${k}')">${t}</button>`).join('')}</div>${body}`}
+function rcPlayerCardHtml(){
+ const plate=rcItem(RC_DATA.equippedPlate),theme=plate?plate.theme:'default';
+ const effects=rcEffects();
+ return `<div class="rc-player-card rc-theme-${theme}">
+  <div class="rc-card-topline"><span>ROYAL CASINO</span><span>${plate?plate.rarity:'BASIC'} MEMBER</span></div>
+  <div class="rc-card-main"><div class="rc-card-crest"><span>♛</span><small>RC</small></div>
+   <div class="rc-card-identity"><small>PLAYER NAME</small><strong>${E(me.name)}</strong>
+    <div class="rc-card-title">${EQ?tchip(EQ):'<span class="rc-no-title">NO TITLE EQUIPPED</span>'}</div>
+   </div></div>
+  <div class="rc-card-bottom"><span>${plate?E(plate.name):'STANDARD NAMEPLATE'}</span><span>THE GRAND SALON</span></div>
+ </div><div class="rc-profile-equipped"><div class="rc-profile-equipped-title">EQUIPPED FRAGMENTS <span>${effects.length}/3</span></div>
+  <div class="rc-profile-fragments">${[0,1,2].map(i=>{const x=rcItem(RC_DATA.equipped[i]);return x?`<span class="rc-profile-frag"><i>✧</i>${E(x.name)}</span>`:`<span class="rc-profile-frag is-empty">SLOT ${i+1} · EMPTY</span>`}).join('')}</div>
+ </div>`
 }
-function colDate(){const d=new Date(Date.now()+9*3600000);return `${d.getUTCFullYear()}-${String(d.getUTCMonth()+1).padStart(2,'0')}-${String(d.getUTCDate()).padStart(2,'0')}`}
-function colNewState(){return {v:1,starter:false,medals:0,dust:0,owned:[],equippedFragments:[null,null,null],equippedCosmetics:{},history:[],draws:0,pity:0,lastDaily:'',lastLuckDate:''}}
-function colNormalise(raw){const d={...colNewState(),...(raw&&typeof raw==='object'?raw:{})};
- if(!Array.isArray(d.owned))d.owned=[];if(!Array.isArray(d.equippedFragments))d.equippedFragments=[null,null,null];
- d.equippedFragments=[d.equippedFragments[0]||null,d.equippedFragments[1]||null,d.equippedFragments[2]||null];
- if(!d.equippedCosmetics||typeof d.equippedCosmetics!=='object')d.equippedCosmetics={};
- if(!Array.isArray(d.history))d.history=[];d.medals=Math.max(0,Math.floor(+d.medals||0));d.dust=Math.max(0,Math.floor(+d.dust||0));d.draws=Math.max(0,Math.floor(+d.draws||0));d.pity=Math.max(0,Math.min(99,Math.floor(+d.pity||0)));return d;
+function rcPlateOption(x){const active=RC_DATA.equippedPlate===x.id;return `<div class="rc-plate-option">
+ <div class="rc-plate-sample rc-theme-${x.theme}"><span class="rc-plate-orbit">♛</span><span class="rc-plate-sample-name">${E(me.name)}</span><span class="rc-plate-sample-rarity">${x.rarity}</span></div>
+ <div class="rc-plate-option-info"><b>${E(x.name)}</b><small>${E(x.desc)}</small></div>
+ <button class="s" onclick="rcEquipPlate('${x.id}')" ${active?'disabled':''}>${active?'装備中':'このプレートにする'}</button>
+ </div>`}
+function rcProfileRender(){
+ const e=$('#profile');if(!e||!RC_DATA||!me)return;
+ const titles=typeof TL!=='undefined'?TL.filter(t=>own1(t)):[],plates=rcOwned('plate');
+ const titleHtml=titles.length?titles.map(t=>`<div class="rc-title-row"><div>${tchip(t.id)}<small>${E(t.ds)}</small></div>${EQ===t.id?'<b class="rc-active-label">装備中</b>':`<button class="s" onclick="rcProfileTitle('${t.id}')">付ける</button>`}</div>`).join(''):'<div class="rc-empty-note">獲得した称号はまだありません。称号画面で獲得条件を確認できます。</div>';
+ e.innerHTML=`<div class="rc-page-head"><div><div class="rc-eyebrow">PLAYER CUSTOMIZE</div><h2>MY PROFILE</h2></div><button class="s" onclick="tab('lobby')">ロビーへ戻る</button></div>
+ <div class="rc-profile-card-label"><span>PLAYER CARD</span><small>プロフィールの見た目はここから編集できます</small></div>
+ ${rcPlayerCardHtml()}
+ <div class="rc-profile-section-head"><span>01 / NAMEPLATE</span><small>ネームプレートを選択</small></div>
+ <div class="rc-plate-options">${plates.length?plates.map(rcPlateOption).join(''):'<div class="rc-empty-note">ネームプレートはまだありません。ROYAL COLLECTIONのガチャで獲得できます。</div>'}</div>
+ ${RC_DATA.equippedPlate?'<div class="rc-clear-row"><button class="s" onclick="rcEquipPlate(null)">標準プレートに戻す</button></div>':''}
+ <div class="rc-profile-section-head"><span>02 / TITLE</span><small>獲得した称号をセット</small></div>
+ <div class="rc-current-title">${EQ?`<div>${tchip(EQ)}<small>現在装備中の称号</small></div><button class="s" onclick="rcProfileTitle('')">称号を外す</button>`:'<span>称号は未装備です</span>'}</div>
+ <div class="rc-title-list">${titleHtml}</div>
+ <div class="rc-profile-actions"><button class="s" onclick="tab('ttl')">称号の詳細・獲得条件を見る</button><button onclick="tab('collection')">ROYAL COLLECTIONへ</button></div>`
 }
-let COL_STATE=null,COL_BUSY=false,COL_REVEAL_TIMER=0,COL_REVEAL_REVEAL=null;
-const COL_PATH=()=>`collection/${pid}`;
-async function colSave(){if(!me||!COL_STATE)return false;const data=JSON.parse(JSON.stringify(COL_STATE));L.set('collection/'+pid,data);
- if(DB_URL){try{const res=await tmo(fetch(U(COL_PATH()),{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify(data)}),6000);if(!res.ok)throw new Error('HTTP '+res.status);return true}catch(e){toast('コレクションの共有保存に失敗しました。端末内には保存されています');return false}}
- return true;
+window.rcProfileTitle=async function(id){await ttlEq(id);rcProfileRender();rcRefreshWho()};
+function rcInstall(){
+ // Lobby routes and top shortcut
+ $('#lobby').insertAdjacentHTML('beforeend',gc('collection','ROYAL COLLECTION','Cでガチャを引き、フラグメントとネームプレートを集めよう。','<b style="font:700 17px Georgia,serif;letter-spacing:.08em;color:#e3cf9a">♛ COLLECTION</b>')+gc('profile','MY PROFILE','ネームプレートと獲得した称号を編集できます。','<b style="font:700 19px Georgia,serif;letter-spacing:.12em;color:#e3cf9a">PROFILE</b>'));
+ $('#lobby').insertAdjacentHTML('afterend','<div class="box" id="collection" hidden></div><div class="box" id="profile" hidden></div>');
+ $('#top>div:last-child').insertAdjacentHTML('afterbegin','<button class="s" onclick="tab(\'profile\')">PROFILE</button>');
+ const oldWho=whoR;whoR=function(){if(!me)return;rcRefreshWho()};
+ const oldLogin=login_;login_=async function(n){RC_DATA=null;await oldLogin(n);if(!me)return;RC_DATA=rcNormalize(await get('collection/'+pid));rcRefreshWho();if(!$('#profile').hidden)rcProfileRender();if(!$('#collection').hidden)rcRender()};
+ const oldLogout=logout;logout=function(){RC_DATA=null;RC_BUSY=false;RC_restoreCfg();oldLogout()};
+ const oldTab=tab;tab=function(t){if(t==='collection'||t==='profile'){oldTab('lobby');$('#lobby').hidden=true;$('#collection').hidden=t!=='collection';$('#profile').hidden=t!=='profile';if(t==='collection')rcRender();else rcProfileRender();scrollTo(0,0);return}$('#collection').hidden=true;$('#profile').hidden=true;oldTab(t)};
+ // Add the equipped nameplate to the read-only profile popup as well.
+ const baseAdmDel=admDel;admDel=async function(h){await baseAdmDel(h);if(OWNER.includes(me.name))await set('collection/'+h,null)};
+ const oldProf=prof;prof=async function(i){await oldProf(i);const p=RKD&&RKD.ps&&RKD.ps[i];if(!p)return;const d=await get('collection/'+hex(p.name));const id=d&&d.equippedPlate,x=rcItem(id);if(!x)return;const head=document.querySelector('#prof .pfc>.c');if(head){head.classList.add('rc-profile-plate-head');const b=head.querySelector('b');if(b)b.className='rc-nameplate rc-theme-'+x.theme}};
+ // Include gacha/profile data in the existing owner account deletion.
+ if(typeof admDel==='function'){
+   const src=admDel.toString();
+   if(!src.includes("'collection/'+h")){
+     const old="'ach/'+h,'eq/'+h].map(p=>set(p,null))";
+     const text=admDel.toString();
+     // admDel is re-declared below with the same behavior when the exact source is patched on disk.
+   }
+ }
+ // Game-only effect hooks. They apply to solo rounds and do not affect room matches or lottery entries.
+ const baseStart=start;start=async function(...a){RC_restoreCfg();const ok=await baseStart(...a);if(ok&&RC_DATA&&!(typeof PRAC!=='undefined'&&PRAC)&&RC_GAME_IDS.includes(CT))RC_applyCfg();return ok};
+ const basePay=payOf,baseFin=fin;
+ fin=async function(id,w,t){const eligible=!!(RC_DATA&&me&&RC_GAME_IDS.includes(id)&&cur>0&&!(typeof PRAC!=='undefined'&&PRAC));if(!eligible){try{return await baseFin(id,w,t)}finally{RC_restoreCfg()}}
+   const normal=basePay(w);let adjusted=normal;const day=RC_JST();
+   if(normal>cur){adjusted+=Math.floor((normal-cur)*rcSum('fortune',0.08))}
+   else if(normal===0){adjusted+=Math.floor(cur*rcSum('defense',0.08));const luck=rcSum('luck',0.08);if(luck>0&&RC_DATA.luckUsed!==day&&Math.random()<luck){adjusted+=Math.floor(cur*.25);RC_DATA.luckUsed=day;await rcSave();toast('LUCK：星の加護で賭け金の25%が戻りました')}}
+   const originalPay=payOf;payOf=()=>adjusted;
+   try{await baseFin(id,w,t)}finally{payOf=originalPay;RC_restoreCfg()}
+   if(w>0){const chance=rcSum('special',0.1);if(chance>0&&Math.random()<chance){const amount=Math.max(1,rcEffects().reduce((m,x)=>x.cat==='SPECIAL'?Math.max(m,x.effect.dust||1):m,1));RC_DATA.dust+=amount;await rcSave();toast(`SPECIAL：交換素材を${amount}個獲得しました`)}}
+   if(!$('#collection').hidden)rcRender();if(!$('#profile').hidden)rcProfileRender();
+ };
 }
-async function colLoad(){if(!me)return;let raw=null;try{raw=await get(COL_PATH())}catch(e){}COL_STATE=colNormalise(raw);let changed=false;
- let reward=0;if(!COL_STATE.starter){COL_STATE.starter=true;COL_STATE.medals+=900;reward+=900;changed=true}
- const today=colDate();if(COL_STATE.lastDaily!==today){COL_STATE.lastDaily=today;COL_STATE.medals+=100;reward+=100;changed=true}if(reward)toast(`ROYAL COLLECTION：無料メダル +${reward.toLocaleString()}枚を受け取りました`);
- if(changed)await colSave();colRenderProfile();
-}
-function colItem(id){return COL_ITEMS.find(x=>x.id===id)||null}
-function colOwnedItems(){return COL_ITEMS.filter(x=>COL_STATE&&COL_STATE.owned.includes(x.id))}
-function colEquippedFragments(){return (COL_STATE?.equippedFragments||[]).map(colItem).filter(x=>x&&x.type==='fragment')}
-function colEffects(){const fs=colEquippedFragments();const total=k=>fs.filter(x=>x.category===k).reduce((a,x)=>a+(x.rate||0),0);return {luck:Math.min(.03,total('LUCK')),fortune:Math.min(.06,total('FORTUNE')),control:Math.min(.05,total('CONTROL')),defense:Math.min(.05,total('DEFENSE')),special:Math.min(.12,total('SPECIAL'))}}
-function colPct(v){return (v*100).toFixed(1).replace(/\.0$/,'')+'%'}
-function colRarityClass(r){return 'col-r-'+String(r||'N').toLowerCase()}
-function colEsc(s){return E(String(s??''))}
-function colTopNav(){return `<div class="col-nav"><button class="s" onclick="tab('collection')">COLLECTION</button><button class="s" onclick="tab('fragments')">FRAGMENTS</button><button class="s" onclick="tab('exchange')">EXCHANGE</button></div>`}
-function colRenderProfile(){if(!me||!COL_STATE)return;const pick=type=>colItem(COL_STATE.equippedCosmetics[type]);const plate=pick('plate'),bg=pick('bg'),icon=pick('icon'),title=pick('title'),card=pick('card'),chip=pick('chip');
- const who=$('#who');if(who){who.innerHTML=`<div class="col-identity ${plate?colRarityClass(plate.rarity):''}" style="${bg?`--col-profile-bg:${bg.rarity==='UR'?'linear-gradient(120deg,#4b0d18,#16110a 65%,#9b752c)':bg.rarity==='SSR'?'linear-gradient(120deg,#3b0b14,#14110e 70%,#6f2027)': 'linear-gradient(120deg,#15221d,#111 70%,#5a4624)'}`:'--col-profile-bg:linear-gradient(120deg,#171311,#090909)'}"><span class="col-profile-icon">${icon?icon.icon:'♟'}</span><span><b>${colEsc(me.name)}</b>${title?`<small>${colEsc(title.name)}</small>`:''}</span></div>`}
- document.body.dataset.colCard=card?card.id:'';document.body.dataset.colChip=chip?chip.id:'';
-}
-function colRarityName(r){return `${r} · ${COL_RARITY_DESC[r]||''}`}
-function colCosmeticButton(it){const eq=COL_STATE.equippedCosmetics[it.type]===it.id;return `<article class="col-item ${colRarityClass(it.rarity)}"><div class="col-item-icon">${colEsc(it.icon)}</div><div class="col-item-main"><div class="col-item-kicker">${colEsc(it.label)} / ${colRarityName(it.rarity)}</div><b>${colEsc(it.name)}</b><p>${colEsc(it.desc)}</p><button class="s col-action" onclick="colEquipCosmetic('${it.id}')">${eq?'装備解除':'装備する'}</button></div>${eq?'<span class="col-equipped">EQUIPPED</span>':''}</article>`}
-function colRenderCollection(){if(!COL_STATE)return;const owned=colOwnedItems().filter(x=>x.type!=='fragment');const hist=COL_STATE.history.slice(0,14);
- $('#collection').innerHTML=colTopNav()+`<div class="col-head"><div class="lt">ROYAL COLLECTION</div><h2>THE ROYAL VAULT</h2><p>ロイヤルカジノ専用コレクション。装飾品とフラグメントを集め、自分だけのスタイルを整えよう。</p></div>
- <div class="col-wallet"><div><small>ROYAL MEDALS</small><b>${COL_STATE.medals.toLocaleString()} <small>枚</small></b></div><div><small>CROWN DUST</small><b>${COL_STATE.dust.toLocaleString()} <small>個</small></b></div><div><small>UR保証まで</small><b>${Math.max(0,100-COL_STATE.pity)} <small>回</small></b></div></div>
- <div class="col-banner"><div class="col-banner-mark">♛</div><div><div class="col-kicker">LIMITED COLLECTION ・ PERMANENT</div><h3>ROYAL RELIC GACHA</h3><p>現実のお金は不要。専用メダルのみで利用できます。</p></div></div>
- <div class="col-pull-buttons"><button onclick="colPull(1)"><b>1回引く</b><small>100 MEDALS</small></button><button onclick="colPull(10)" class="col-ten"><b>10回引く</b><small>900 MEDALS ・ 10連割引</small></button></div>
- <div class="col-rates"><b>排出率・保証について</b><div class="col-rate-grid">${COL_RARITIES.slice().reverse().map(r=>`<div><b class="${colRarityClass(r)}">${r}</b><span>${COL_RATES[r].toFixed( r==='N'||r==='R'?0:1)}%</span></div>`).join('')}</div><p>10連はR以上が1個以上確定。URはUR以外が99回続くと、次の1回が確定でURになります。天井カウントはプレイヤーごとに保存されます。</p><p>重複アイテムはレアリティに応じてクラウンダストに自動変換されます。</p></div>
- <div class="col-section"><div class="col-section-title"><b>COLLECTED COSMETICS</b><span>${owned.length} ITEMS</span></div>${owned.length?owned.map(colCosmeticButton).join(''):'<div class="col-empty">まだ装飾アイテムを所持していません。ガチャで獲得すると、ここに追加されます。</div>'}</div>
- <div class="col-section"><div class="col-section-title"><b>RECENT ACQUISITIONS</b><span>直近14件</span></div>${hist.length?hist.map(h=>`<div class="col-history"><span class="${colRarityClass(h.rarity)}">${colEsc(h.rarity)}</span><b>${colEsc(h.name)}</b><small>${h.duplicate?`重複 → ダスト +${h.dust||0}`:'NEW ITEM'}</small><time>${new Date(h.t).toLocaleString('ja-JP',{month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit'})}</time></div>`).join(''):'<div class="col-empty">ガチャ履歴はまだありません。</div>'}</div>`;
-}
-function colFragmentEffectLine(it){const p=colPct(it.rate||0);switch(it.category){case'LUCK':return `負けた回を引き分けにする抽選：${p}（成功は1日1回）`;case'FORTUNE':return `勝利時の利益上乗せ：${p}`;case'CONTROL':return `HIGH & LOW「SAME」成功時の倍率上乗せ：${p}`;case'DEFENSE':return `敗北時の賭け金返還：${p}`;default:return `勝利時にダスト1個を得る確率：${p}`}}
-function colFragmentSupportLine(it){return it.category==='CONTROL'?'対応ゲーム：HIGH & LOW（SAME予想のみ）':'対応ゲーム：スロット／パチスロ／ルーレット／ブラックジャック／ビデオポーカー／ハイ＆ロー'}
-function colRenderFragments(){if(!COL_STATE)return;const fs=colOwnedItems().filter(x=>x.type==='fragment'),eq=COL_STATE.equippedFragments,eff=colEffects();
- $('#fragments').innerHTML=colTopNav()+`<div class="col-head"><div class="lt">FRAGMENT SYSTEM</div><h2>THREE SLOTS</h2><p>所持フラグメントから最大3個を装備できます。同じフラグメントを複数枠に入れることはできません。</p></div>
- <div class="col-slots">${[0,1,2].map(i=>{const it=colItem(eq[i]);return `<div class="col-slot ${it?colRarityClass(it.rarity):'col-slot-empty'}"><small>SLOT 0${i+1}</small>${it?`<div class="col-slot-symbol">${colEsc(it.icon)}</div><b>${colEsc(it.name)}</b><span class="${colRarityClass(it.rarity)}">${it.rarity} / ${it.category}</span><button class="s" onclick="colUnequipFragment(${i})">解除する</button>`:'<div class="col-slot-symbol">＋</div><b>EMPTY SLOT</b><span>フラグメント未装備</span>'}</div>`}).join('')}</div>
- <div class="col-section"><div class="col-section-title"><b>ACTIVE EFFECTS</b><span>現在発動中</span></div><div class="col-active-effects">${[['LUCK','幸運',eff.luck,'上限3%'],['FORTUNE','報酬',eff.fortune,'上限6%'],['CONTROL','操作',eff.control,'上限5%'],['DEFENSE','防御',eff.defense,'上限5%'],['SPECIAL','特殊',eff.special,'上限12%']].map(([k,n,v,cap])=>`<div><span>${k} / ${n}<small style="display:block;opacity:.55;font-size:9px">${cap}</small></span><b>${colPct(v)}</b></div>`).join('')}</div><p class="col-note">効果はソロゲーム用です。LUCKは1日1回まで、確率・倍率上昇には上限があります。部屋対戦・観戦予想・宝くじ・練習モードには適用されません。</p></div>
- <div class="col-section"><div class="col-section-title"><b>OWNED FRAGMENTS</b><span>${fs.length} TYPES</span></div>${fs.length?fs.map(it=>{const slot=eq.indexOf(it.id),isEq=slot>=0;return `<article class="col-item ${colRarityClass(it.rarity)}"><div class="col-item-icon">${colEsc(it.icon)}</div><div class="col-item-main"><div class="col-item-kicker">${it.category} / ${colRarityName(it.rarity)}</div><b>${colEsc(it.name)}</b><p>${colEsc(it.desc)}</p><small class="col-frag-effect">${colEsc(colFragmentEffectLine(it))}</small><small class="col-frag-effect">${colEsc(colFragmentSupportLine(it))}</small><button class="s col-action" ${isEq||eq.filter(Boolean).length>=3?'disabled':''} onclick="colEquipFragment('${it.id}')">${isEq?'装備中':eq.filter(Boolean).length>=3?'空き枠なし':'装備する'}</button>${isEq?`<button class="s col-action" onclick="colUnequipFragment(${slot})">解除</button>`:''}</div>${isEq?'<span class="col-equipped">EQUIPPED</span>':''}</article>`}).join(''):'<div class="col-empty">フラグメントはまだありません。ガチャまたは交換所で入手できます。</div>'}</div>`;
-}
-function colRenderExchange(){if(!COL_STATE)return;const list=COL_ITEMS.filter(x=>!COL_STATE.owned.includes(x.id));
- $('#exchange').innerHTML=colTopNav()+`<div class="col-head"><div class="lt">ROYAL EXCHANGE</div><h2>THE EXCHANGE</h2><p>重複アイテムから得たクラウンダストを使い、未所持のアイテムと交換できます。</p></div><div class="col-wallet col-wallet-one"><div><small>CROWN DUST</small><b>${COL_STATE.dust.toLocaleString()} <small>個</small></b></div></div><div class="col-note">交換後のアイテムは所持品に追加され、装備画面から選択できるようになります。</div><div class="col-section"><div class="col-section-title"><b>AVAILABLE ITEMS</b><span>${list.length} ITEMS</span></div>${list.length?list.map(it=>{const cost=COL_DUST_COST[it.rarity];return `<article class="col-item ${colRarityClass(it.rarity)}"><div class="col-item-icon">${colEsc(it.icon)}</div><div class="col-item-main"><div class="col-item-kicker">${it.type==='fragment'?it.category:it.label} / ${colRarityName(it.rarity)}</div><b>${colEsc(it.name)}</b><p>${colEsc(it.desc)}</p><div class="col-cost">交換費用：<b>${cost.toLocaleString()} DUST</b></div><button class="s col-action" ${COL_STATE.dust<cost?'disabled':''} onclick="colExchange('${it.id}')">交換する</button></div></article>`}).join(''):'<div class="col-empty">すべてのアイテムを所持しています。新しいアイテムの追加をお待ちください。</div>'}</div>`;
-}
-function colRenderAll(){if(!COL_STATE)return;colRenderProfile();if(!$('#collection').hidden)colRenderCollection();if(!$('#fragments').hidden)colRenderFragments();if(!$('#exchange').hidden)colRenderExchange()}
-function colGo(t){tab(t)}
-async function colEquipCosmetic(id){if(!COL_STATE||!COL_STATE.owned.includes(id))return;const it=colItem(id);if(!it||it.type==='fragment')return;COL_STATE.equippedCosmetics=COL_STATE.equippedCosmetics||{};if(COL_STATE.equippedCosmetics[it.type]===id)delete COL_STATE.equippedCosmetics[it.type];else COL_STATE.equippedCosmetics[it.type]=id;await colSave();colRenderAll();toast(it.name+(COL_STATE.equippedCosmetics[it.type]?' を装備しました':' を解除しました'))}
-async function colEquipFragment(id){if(!COL_STATE||!COL_STATE.owned.includes(id))return;const it=colItem(id);if(!it||it.type!=='fragment')return;const slots=COL_STATE.equippedFragments;if(slots.includes(id))return toast('同じフラグメントは複数枠に装備できません');const i=slots.findIndex(x=>!x);if(i<0)return toast('装備枠がいっぱいです。先に解除してください');slots[i]=id;await colSave();colRenderAll();toast(it.name+' を装備しました')}
-async function colUnequipFragment(i){if(!COL_STATE||i<0||i>2)return;COL_STATE.equippedFragments[i]=null;await colSave();colRenderAll();toast('フラグメントを解除しました')}
-async function colExchange(id){if(!COL_STATE||COL_BUSY)return;const it=colItem(id);if(!it||COL_STATE.owned.includes(id))return;const cost=COL_DUST_COST[it.rarity];if(COL_STATE.dust<cost)return toast('クラウンダストが不足しています');COL_BUSY=true;COL_STATE.dust-=cost;COL_STATE.owned.push(id);COL_STATE.history.unshift({id:it.id,name:it.name,rarity:it.rarity,t:Date.now(),duplicate:false,exchange:true});COL_STATE.history=COL_STATE.history.slice(0,80);await colSave();COL_BUSY=false;colRenderAll();toast(it.name+' と交換しました')}
-function colChooseRarity(){let r=Math.random()*100;for(const k of ['UR','SSR','SR','R','N']){if(r<COL_RATES[k])return k;r-=COL_RATES[k]}return 'N'}
-function colRollOne(){let rarity=COL_STATE.pity>=99?'UR':colChooseRarity();const pool=COL_ITEMS.filter(x=>x.rarity===rarity);const item=pool[Math.floor(Math.random()*pool.length)];if(rarity==='UR')COL_STATE.pity=0;else COL_STATE.pity++;COL_STATE.draws++;return item}
-function colBuildResultCards(results){return results.map((x,i)=>`<article class="col-reward ${colRarityClass(x.item.rarity)}" style="--delay:${i*65}ms"><div class="col-reward-shine"></div><div class="col-reward-rarity">${x.item.rarity} / ${COL_RARITY_DESC[x.item.rarity]}</div><div class="col-reward-icon">${colEsc(x.item.icon)}</div><b>${colEsc(x.item.name)}</b><small>${x.item.type==='fragment'?'FRAGMENT':x.item.label||'COSMETIC'}</small>${x.duplicate?`<em>DUPLICATE ・ +${x.dust} DUST</em>`:'<em class="col-new">NEW ACQUISITION</em>'}</article>`).join('')}
-function colShowReveal(results){const best=results.reduce((a,x)=>COL_RARITIES.indexOf(x.item.rarity)>COL_RARITIES.indexOf(a)?x.item.rarity:a,'N');const time=best==='UR'?2400:best==='SSR'?1900:best==='SR'?1500:best==='R'?1100:850;
- const layer=document.createElement('div');layer.id='colReveal';layer.className='col-reveal-overlay '+(best==='UR'?'col-ur':best==='SSR'?'col-ssr':'');
- layer.innerHTML=`<div class="col-reveal-stage"><div class="col-reveal-brand">ROYAL COLLECTION</div><div class="col-reveal-line"></div><div class="col-reveal-wait" id="colRevealWait"><div class="col-seal">♛</div><b>${best==='UR'?'THE IMPERIAL SEAL':best==='SSR'?'ROYAL SEAL':'A NEW ACQUISITION'}</b><small>封印を解いています…</small></div><div class="col-reveal-content" id="colRevealContent" hidden><div class="col-reveal-title">${best==='UR'?'ULTRA RARE DISCOVERED':best==='SSR'?'DOUBLE SUPER RARE':'ACQUISITIONS'}</div><div class="col-reveal-grid">${colBuildResultCards(results)}</div><div class="col-reveal-summary">${results.length}件獲得 ・ UR保証まで ${100-COL_STATE.pity}回</div><button onclick="colCloseReveal()">閉じる</button></div><button class="col-skip" id="colRevealSkip" onclick="colSkipReveal()">演出をスキップ</button></div>`;
- document.body.appendChild(layer);
- const reveal=()=>{const w=$('#colRevealWait'),c=$('#colRevealContent'),s=$('#colRevealSkip');if(!layer.isConnected||!c)return;w.hidden=true;c.hidden=false;s.textContent='閉じる';s.onclick=colCloseReveal;layer.classList.add('col-revealed')};COL_REVEAL_REVEAL=reveal;COL_REVEAL_TIMER=setTimeout(reveal,time);
- if(best==='UR'){try{[392,523,659,784,1047].forEach((f,i)=>tone(f,.42,i*.11,'triangle',.18))}catch(e){}}
- else if(best==='SSR'){try{[392,523,659,784].forEach((f,i)=>tone(f,.24,i*.09,'triangle',.13))}catch(e){}}
- else {try{tone(best==='SR'?660:best==='R'?520:420,.25,0,'triangle',.1)}catch(e){}}
-}
-function colSkipReveal(){if(COL_REVEAL_TIMER)clearTimeout(COL_REVEAL_TIMER);if(COL_REVEAL_REVEAL)COL_REVEAL_REVEAL()}
-function colCloseReveal(){if(COL_REVEAL_TIMER)clearTimeout(COL_REVEAL_TIMER);const x=$('#colReveal');if(x)x.remove();COL_REVEAL_REVEAL=null}
-async function colPull(count){if(!me||!COL_STATE)return toast('ログインしてください');if(PRAC)return toast('練習モード中はガチャを利用できません');if(COL_BUSY)return;const cost=count===10?900:100;if(COL_STATE.medals<cost)return toast('ロイヤルメダルが不足しています');COL_BUSY=true;
- try{COL_STATE.medals-=cost;const results=[];for(let i=0;i<count;i++)results.push({item:colRollOne(),duplicate:false,dust:0});
-  if(count===10&&!results.some(x=>x.item.rarity!=='N')){const pool=COL_ITEMS.filter(x=>x.rarity==='R');results[9].item=pool[Math.floor(Math.random()*pool.length)];}
-  results.forEach(x=>{const it=x.item;if(COL_STATE.owned.includes(it.id)){x.duplicate=true;x.dust=COL_DUST_DUP[it.rarity];COL_STATE.dust+=x.dust}else{COL_STATE.owned.push(it.id)}});
-  const now=Date.now();results.forEach(x=>COL_STATE.history.unshift({id:x.item.id,name:x.item.name,rarity:x.item.rarity,t:now,duplicate:x.duplicate,dust:x.dust}));COL_STATE.history=COL_STATE.history.slice(0,80);
-  await colSave();colRenderAll();colShowReveal(results);
- }catch(e){console.error(e);toast('ガチャ処理でエラーが発生しました')}finally{COL_BUSY=false;}
-}
-
-function colFragmentSupported(category){if(category==='CONTROL')return 'HIGH & LOW（SAME選択時）';return COL_GAME_NAMES&&category==='LUCK'?'スロット／パチスロ／ルーレット／ブラックジャック／ポーカー／ハイ＆ロー':'ソロゲーム（練習モードを除く）'}
-function colRenderProfileAfterLogin(){if(!COL_STATE)return;colRenderProfile()}
-
-/* 既存ロビーへ追加。ゲーム画面と従来データは触らない。 */
-$('#lobby').insertAdjacentHTML('beforeend',gc('collection','ROYAL COLLECTION','ガチャで装飾品とフラグメントを収集。専用メダル・交換所・装備管理。','<div style="font:42px Georgia;color:#d8b25a;text-shadow:0 0 18px #a8812f">♛</div>'));
-$('#tabs').insertAdjacentHTML('afterend','<div class="box" id="collection" hidden></div><div class="box" id="fragments" hidden></div><div class="box" id="exchange" hidden></div>');
-$('#top>div:last-child').insertAdjacentHTML('afterbegin','<button class="s" onclick="tab(\'collection\')">COLLECTION</button>');
-GN.collection='ROYAL COLLECTION';GN.fragments='FRAGMENTS';GN.exchange='EXCHANGE';
-
-/* 独立ページを既存tab関数へ追加 */
-const colTabBefore=tab;tab=function(t){colTabBefore(t);['collection','fragments','exchange'].forEach(k=>{const e=$('#'+k);if(e)e.hidden=k!==t});if(t==='collection')colRenderCollection();if(t==='fragments')colRenderFragments();if(t==='exchange')colRenderExchange();if(['collection','fragments','exchange'].includes(t))$('#tray').hidden=true};
-
-/* ログイン時にプレイヤー別コレクションを読込。退出時は表示だけ初期化。 */
-const colLoginBefore=login_;login_=async function(n){await colLoginBefore(n);await colLoad();};
-const colLogoutBefore=logout;logout=function(){COL_STATE=null;colLogoutBefore()};
-
-/* ゲーム効果：ソロゲームのみに限定し、数値上限を設定。 */
-const colFinBefore=fin;fin=async function(id,w,t){
- if(!COL_STATE||PRAC||!COL_SOLO_GAMES.includes(id))return colFinBefore(id,w,t);
- const eff=colEffects(),today=colDate();let nextW=w,msg=String(t||''),refund=0,bonusDust=false;
- if(nextW<=0&&eff.luck>0&&COL_STATE.lastLuckDate!==today&&Math.random()<eff.luck){nextW=1;COL_STATE.lastLuckDate=today;msg+=' ｜LUCK発動：損失を引き分けに変更';await colSave()}
- if(nextW>1&&eff.fortune>0){nextW=1+(nextW-1)*(1+eff.fortune);msg+=` ｜FORTUNE +${colPct(eff.fortune)}`}
- if(nextW<=0&&eff.defense>0&&cur>0)refund=Math.min(cur,Math.floor(cur*eff.defense));
- if(nextW>1&&eff.special>0&&Math.random()<eff.special){COL_STATE.dust+=1;bonusDust=true;await colSave()}
- await colFinBefore(id,nextW,msg);
- if(refund>0){await add(refund);try{let h=L.get('hist/'+pid)||[];h=Array.isArray(h)?h:Object.values(h||{});if(h.length){h[0].p=(+h[0].p||0)+refund;h[0].bal=(+h[0].bal||0)+refund;await set('hist/'+pid,h.slice(0,40))}}catch(e){}const el=$('#m-'+id);if(el)el.textContent+=' ｜DEFENSE 返還 +'+refund.toLocaleString()+'C'}
- if(bonusDust){const el=$('#m-'+id);if(el)el.textContent+=' ｜SPECIAL クラウンダスト +1';toast('SPECIAL発動：クラウンダストを1個獲得')}
-};
-const colHlOddBefore=hlOdd;hlOdd=function(k){let v=colHlOddBefore(k);if(k==='sm'&&COL_STATE&&!PRAC){const x=colEffects().control;if(x&&v)v=+(v*(1+x)).toFixed(2)}return v};
-
-/* ===== responsive royal design ===== */
+function RC_applyCfg(){if(RC_CFG_SNAPSHOT)return;const v=rcSum('control',3);if(!v)return;RC_CFG_SNAPSHOT={};['slot','pachi','roul','bj'].forEach(k=>{RC_CFG_SNAPSHOT[k]=cfg[k];cfg[k]=Math.min(100,(+cfg[k]||0)+v)})}
+function RC_restoreCfg(){if(!RC_CFG_SNAPSHOT)return;Object.keys(RC_CFG_SNAPSHOT).forEach(k=>cfg[k]=RC_CFG_SNAPSHOT[k]);RC_CFG_SNAPSHOT=null}
+// Player-card visual language: collectible banner + compact nameplate badge.
 document.head.insertAdjacentHTML('beforeend',`<style>
-#collection,#fragments,#exchange{background:linear-gradient(155deg,#120a0c,#090707);border:1px solid #b89a5866;padding:12px;overflow:hidden}
-.col-nav{display:flex;gap:5px;margin:0 0 12px}.col-nav button{flex:1;font-size:10px;letter-spacing:.08em;padding:9px 4px}
-.col-head{text-align:center;padding:12px 4px 16px;border-bottom:1px solid #b89a5844}.col-head h2{margin:3px 0 7px;font:400 23px Georgia,serif;letter-spacing:.2em;color:#e3cf9a}.col-head p{font:12px/1.7 system-ui,sans-serif;opacity:.72;margin:0}
-.col-wallet{display:grid;grid-template-columns:repeat(3,1fr);gap:6px;margin:12px 0}.col-wallet>div{background:linear-gradient(145deg,#201719,#0c0a0a);border:1px solid #b89a5844;padding:9px 5px;text-align:center;min-width:0}.col-wallet small{display:block;color:#b89a58;font:10px Georgia,serif;letter-spacing:.08em}.col-wallet b{display:block;font:700 17px Georgia,serif;color:#f0dfae;margin-top:3px;overflow-wrap:anywhere}.col-wallet b small{display:inline;font-size:10px}.col-wallet-one{grid-template-columns:1fr}
-.col-banner{display:flex;align-items:center;gap:13px;padding:14px;margin:12px 0;background:radial-gradient(ellipse at 20% 50%,#4b161c,#160a0d 72%);border:1px solid #b89a5888;box-shadow:inset 0 0 24px #000a}.col-banner-mark{font:54px Georgia;color:#d8b25a;text-shadow:0 0 16px #d8b25a88}.col-kicker{font:10px Georgia,serif;letter-spacing:.17em;color:#d8b25a}.col-banner h3{margin:4px 0;font:400 17px Georgia,serif;letter-spacing:.13em;color:#f1e6c9}.col-banner p{margin:0;font:11px/1.5 system-ui,sans-serif;opacity:.75}
-.col-pull-buttons{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin:12px 0}.col-pull-buttons button{margin:0;padding:14px 5px;min-height:62px}.col-pull-buttons button b,.col-pull-buttons button small{display:block}.col-pull-buttons button b{font:700 15px Georgia,serif;letter-spacing:.12em}.col-pull-buttons button small{font:10px Georgia,serif;margin-top:4px;opacity:.78}.col-pull-buttons .col-ten{background:linear-gradient(#f0d98e,#b1802c);box-shadow:0 0 0 1px #f4dc8a,0 4px 12px #0009}
-.col-rates,.col-section{margin:14px 0;padding:12px;background:linear-gradient(145deg,#171214,#0d0b0b);border:1px solid #b89a583b}.col-rates>b{font:13px Georgia,serif;color:#e3cf9a;letter-spacing:.1em}.col-rate-grid{display:grid;grid-template-columns:repeat(5,1fr);gap:4px;margin:9px 0}.col-rate-grid>div{text-align:center;background:#080707;border:1px solid #ffffff12;padding:7px 2px}.col-rate-grid b,.col-rate-grid span{display:block;font-size:12px}.col-rate-grid span{margin-top:3px;color:#eee}.col-rates p,.col-note{font:11px/1.65 system-ui,sans-serif;opacity:.72;margin:7px 0 0}
-.col-section-title{display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid #b89a5844;padding-bottom:8px;margin-bottom:9px}.col-section-title b{font:12px Georgia,serif;letter-spacing:.13em;color:#e3cf9a}.col-section-title span{font:10px system-ui,sans-serif;opacity:.65}
-.col-item{position:relative;display:flex;gap:10px;padding:10px 8px;margin:8px 0;background:linear-gradient(120deg,#1b1717,#0d0b0b);border:1px solid #ffffff20;min-width:0}.col-item-icon{width:48px;height:56px;flex:0 0 48px;display:flex;align-items:center;justify-content:center;background:radial-gradient(#403322,#110e0b);border:1px solid #b89a5855;color:#e3cf9a;font:28px Georgia,serif}.col-item-main{flex:1;min-width:0}.col-item-kicker{font:9px Georgia,serif;letter-spacing:.08em;opacity:.7;margin-bottom:3px}.col-item-main>b{display:block;font:15px Georgia,serif;color:#f0e6ce}.col-item-main p{margin:4px 0;font:11px/1.6 system-ui,sans-serif;opacity:.72}.col-action{margin:6px 3px 0 0;font-size:11px;padding:7px 10px}.col-equipped{position:absolute;right:6px;top:5px;font:9px Georgia,serif;color:#d8b25a;letter-spacing:.09em}.col-frag-effect{display:block;color:#d8c28b;font:10px/1.5 system-ui,sans-serif}.col-cost{font:11px system-ui,sans-serif;margin:6px 0;color:#c9b987}.col-cost b{color:#eddaa0}.col-empty{text-align:center;padding:22px 10px;font:12px/1.8 system-ui,sans-serif;opacity:.6;border:1px dashed #b89a5833}
-.col-r-n{color:#c4c0b8!important}.col-r-r{color:#9dc7d6!important}.col-r-sr{color:#e5c56e!important}.col-r-ssr{color:#db8b91!important}.col-r-ur{color:#f3d36d!important;text-shadow:0 0 9px #d8b25a88}
-.col-r-n.col-item{border-color:#ffffff2a}.col-r-r.col-item{border-color:#8db5c444}.col-r-sr.col-item{border-color:#e0c06b77}.col-r-ssr.col-item{border-color:#b7445088}.col-r-ur.col-item{border-color:#f1d16c;box-shadow:inset 0 0 18px #d8b25a18,0 0 12px #d8b25a22}
-.col-history{display:grid;grid-template-columns:38px 1fr auto;gap:3px 7px;align-items:center;padding:7px 0;border-bottom:1px solid #ffffff12;font:11px system-ui,sans-serif}.col-history>b{font-size:12px}.col-history small{grid-column:2;opacity:.68}.col-history time{grid-column:3;grid-row:1/3;font-size:9px;opacity:.55}
-.col-slots{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:6px;margin:13px 0}.col-slot{min-width:0;padding:9px 4px;text-align:center;background:linear-gradient(150deg,#211719,#0d0a0a);border:1px solid #b89a58aa;display:flex;flex-direction:column;align-items:center;gap:5px}.col-slot small{font:9px Georgia,serif;color:#b89a58;letter-spacing:.12em}.col-slot-symbol{font:27px Georgia;color:#e3cf9a}.col-slot>b{font:11px Georgia,serif;line-height:1.3;overflow-wrap:anywhere}.col-slot>span{font:9px system-ui,sans-serif}.col-slot button{font-size:10px;padding:6px 8px}.col-slot-empty{border-style:dashed;border-color:#b89a5855;opacity:.7}.col-active-effects{display:grid;grid-template-columns:1fr 1fr;gap:6px}.col-active-effects>div{display:flex;justify-content:space-between;gap:8px;background:#07070788;padding:8px;font:10px system-ui,sans-serif}.col-active-effects b{color:#e3cf9a}
-.col-identity{display:inline-flex;align-items:center;gap:8px;padding:6px 10px;background:var(--col-profile-bg);border:1px solid #b89a5888;max-width:100%}.col-profile-icon{font:20px Georgia;color:#e3cf9a}.col-identity b{font:13px Georgia,serif;color:#eee4d0}.col-identity small{display:block;font:10px Georgia,serif;color:#d8b25a;margin-top:2px}.col-identity.col-r-ur{border-color:#f1d16c;box-shadow:0 0 10px #d8b25a55}
-body[data-col-card="cos_card_r"] .pc{border:2px solid #9d2735}body[data-col-card="cos_card_sr"] .pc{border:2px solid #c7a65c}body[data-col-card="cos_card_ssr"] .pc{border:2px solid #a92c38;box-shadow:0 0 0 1px #d8b25a}body[data-col-card="cos_card_ur"] .pc{border:2px solid #e6c76e;box-shadow:0 0 10px #d8b25a66}
-body[data-col-chip="cos_chip_r"] .ch{box-shadow:0 0 0 3px #9d2735 inset,0 3px 6px #000a}body[data-col-chip="cos_chip_sr"] .ch{box-shadow:0 0 0 3px #c7a65c inset,0 3px 6px #000a}body[data-col-chip="cos_chip_ssr"] .ch{box-shadow:0 0 0 4px #a92c38 inset,0 3px 6px #000a}body[data-col-chip="cos_chip_ur"] .ch{box-shadow:0 0 0 4px #e6c76e inset,0 0 12px #d8b25a99}
-.col-reveal-overlay{position:fixed;inset:0;z-index:999;background:radial-gradient(ellipse at center,#3a2020 0,#090607 72%);display:flex;align-items:center;justify-content:center;padding:14px;overflow:auto}.col-reveal-overlay.col-ssr{background:radial-gradient(ellipse at center,#56121c 0,#090607 72%)}.col-reveal-overlay.col-ur{background:radial-gradient(ellipse at center,#7a5520 0,#2b0e15 36%,#050405 78%);animation:colUrBg 2.4s ease both}@keyframes colUrBg{0%{filter:brightness(.3)}35%{filter:brightness(1.6)}100%{filter:brightness(1)}}.col-reveal-stage{position:relative;width:100%;max-width:540px;max-height:92vh;overflow:auto;text-align:center;padding:18px 10px;background:linear-gradient(145deg,#161011,#080707);border:1px solid #d8b25a99;box-shadow:0 0 0 5px #170f0d,0 0 35px #d8b25a44}.col-reveal-brand{font:12px Georgia,serif;letter-spacing:.3em;color:#d8b25a}.col-reveal-line{height:1px;background:linear-gradient(90deg,transparent,#d8b25a,transparent);margin:12px 0}.col-reveal-wait{padding:35px 8px}.col-seal{font:78px Georgia;color:#e3c777;text-shadow:0 0 26px #d8b25a;animation:colSeal 1s ease-in-out infinite alternate}@keyframes colSeal{from{transform:scale(.92);opacity:.65}to{transform:scale(1.05);opacity:1}}.col-reveal-wait b{display:block;font:15px Georgia,serif;letter-spacing:.2em;color:#f2dfac}.col-reveal-wait small{display:block;margin-top:10px;opacity:.7}.col-reveal-title{font:15px Georgia,serif;letter-spacing:.18em;color:#e3cf9a;margin:8px}.col-reveal-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:7px;max-height:58vh;overflow:auto;padding:4px}.col-reward{position:relative;overflow:hidden;min-width:0;background:linear-gradient(150deg,#1e1918,#090808);border:1px solid #b89a5844;padding:11px 5px;animation:colRewardIn .55s var(--delay) both}.col-reward-shine{position:absolute;inset:0;background:linear-gradient(115deg,transparent 30%,#fff2 50%,transparent 70%);transform:translateX(-120%);animation:colShine 1s calc(var(--delay) + .3s) both}@keyframes colShine{to{transform:translateX(120%)}}@keyframes colRewardIn{from{opacity:0;transform:translateY(24px) scale(.9)}to{opacity:1;transform:none}}.col-reward-rarity{font:9px Georgia,serif;letter-spacing:.12em}.col-reward-icon{font:35px Georgia;color:#e4d09a;margin:7px}.col-reward>b{display:block;font:12px Georgia,serif;overflow-wrap:anywhere}.col-reward>small{display:block;font:9px Georgia,serif;opacity:.55;margin:4px}.col-reward>em{display:block;font:9px Georgia,serif;color:#d8b25a;font-style:normal;margin-top:7px}.col-reward>em.col-new{color:#e7e2d4}.col-ur .col-reward.col-r-ur{border:1px solid #f3d36d;box-shadow:0 0 18px #d8b25a66,inset 0 0 22px #d8b25a2a}.col-ur .col-reward.col-r-ur .col-reward-icon{font-size:46px;text-shadow:0 0 18px #f1d16c}.col-reveal-summary{font:11px system-ui,sans-serif;opacity:.75;margin:10px}.col-reveal-content>button{min-width:150px}.col-skip{position:sticky;bottom:0;margin:8px auto 0;background:#1a1312;color:#e3cf9a;border:1px solid #b89a58;padding:8px 22px;box-shadow:none}.col-revealed .col-reveal-stage{animation:colStageIn .4s both}@keyframes colStageIn{from{transform:scale(.96);opacity:.6}to{transform:none;opacity:1}}
-@media(max-width:390px){.col-head h2{font-size:20px}.col-wallet b{font-size:14px}.col-slot{padding:7px 2px}.col-slot>b{font-size:10px}.col-item-icon{width:40px;flex-basis:40px}.col-reveal-grid{gap:5px}}
+.rc-nameplate{position:relative;display:inline-flex;align-items:center;gap:7px;padding:5px 12px 5px 8px;min-height:34px;border-radius:3px 10px 3px 10px;border-width:1px 2px 1px 5px;border-style:solid;clip-path:polygon(0 0,96% 0,100% 50%,96% 100%,0 100%,4% 50%);box-shadow:inset 0 1px 0 #ffffff33, inset 0 -5px 12px #0005,0 3px 8px #0009;text-shadow:0 1px 2px #0009;letter-spacing:.06em}
+.rc-nameplate i{font-style:normal;font-size:16px;line-height:1;color:#f6df9e;text-shadow:0 0 7px #fff6}
+.rc-nameplate b{font-size:14px;line-height:1.1}
+.rc-nameplate em{font:8px Georgia,serif;font-style:normal;letter-spacing:.16em;opacity:.72;border-left:1px solid #ffffff55;padding-left:7px}
+.rc-player-card{position:relative;isolation:isolate;overflow:hidden;min-height:168px;margin:8px 0 0;padding:14px 16px 12px;border:2px solid #d6b96e;border-radius:9px 3px 9px 3px;box-shadow:0 8px 20px #000a,inset 0 0 0 3px #080707,inset 0 0 30px #0008;color:#fff4d8}
+.rc-player-card:before{content:"";position:absolute;z-index:-1;inset:-30%;background:repeating-linear-gradient(135deg,#ffffff0c 0 1px,transparent 1px 13px),radial-gradient(ellipse at 75% 20%,#ffffff20,transparent 35%);transform:rotate(-7deg)}
+.rc-player-card:after{content:"♛";position:absolute;z-index:-1;right:18px;top:20px;font-size:112px;line-height:1;color:#ffffff12;text-shadow:0 0 20px #fff2}
+.rc-card-topline,.rc-card-bottom{display:flex;justify-content:space-between;align-items:center;gap:8px;font:9px Georgia,serif;letter-spacing:.22em;text-shadow:0 1px 3px #000}
+.rc-card-topline{padding-bottom:8px;border-bottom:1px solid #ffffff3b}
+.rc-card-main{display:flex;align-items:center;gap:13px;padding:14px 0 12px}
+.rc-card-crest{width:58px;height:58px;flex:0 0 58px;display:flex;flex-direction:column;align-items:center;justify-content:center;border:2px double #f4df9d;border-radius:50%;background:radial-gradient(circle,#d2ac5744,#080707aa 72%);box-shadow:0 0 0 4px #0003,0 0 17px #e7c76b66}
+.rc-card-crest span{font-size:29px;line-height:1;color:#f7e4a8}.rc-card-crest small{font:8px Georgia,serif;letter-spacing:.2em;color:#f1d98b;margin-top:2px}
+.rc-card-identity{min-width:0;display:flex;flex-direction:column;align-items:flex-start;gap:4px}.rc-card-identity>small{font:9px Georgia,serif;letter-spacing:.2em;opacity:.78}.rc-card-identity>strong{font-size:22px;line-height:1.15;overflow-wrap:anywhere;text-shadow:0 2px 4px #000}
+.rc-card-title{min-height:20px}.rc-card-title .tt{font-size:12px}.rc-no-title{font-size:10px;letter-spacing:.12em;opacity:.64}
+.rc-card-bottom{padding-top:8px;border-top:1px solid #ffffff3b;font-size:8px;letter-spacing:.15em;opacity:.9}
+.rc-theme-default.rc-player-card,.rc-theme-default.rc-plate-sample{background:linear-gradient(120deg,#171717,#4b4334 48%,#171717)}
+.rc-player-card.rc-theme-brass,.rc-plate-sample.rc-theme-brass{background:linear-gradient(120deg,#30200b,#9d7730 44%,#3b290d)}
+.rc-player-card.rc-theme-crest,.rc-plate-sample.rc-theme-crest{background:linear-gradient(120deg,#17191c,#50565b 48%,#161719)}
+.rc-player-card.rc-theme-crimson,.rc-plate-sample.rc-theme-crimson{background:linear-gradient(120deg,#36070e,#9b1e2c 48%,#2a070d)}
+.rc-player-card.rc-theme-emerald,.rc-plate-sample.rc-theme-emerald{background:linear-gradient(120deg,#052b20,#0f7350 48%,#082b22)}
+.rc-player-card.rc-theme-sapphire,.rc-plate-sample.rc-theme-sapphire{background:linear-gradient(120deg,#081d46,#245b9b 48%,#081b3c)}
+.rc-player-card.rc-theme-amethyst,.rc-plate-sample.rc-theme-amethyst{background:linear-gradient(120deg,#251036,#78469b 48%,#28113b)}
+.rc-player-card.rc-theme-imperial,.rc-plate-sample.rc-theme-imperial{background:linear-gradient(120deg,#4b3008,#e4bd59 48%,#69450b);color:#261900;text-shadow:none}
+.rc-player-card.rc-theme-noir,.rc-plate-sample.rc-theme-noir{background:linear-gradient(120deg,#050505,#343434 48%,#080808)}
+.rc-player-card.rc-theme-crown,.rc-plate-sample.rc-theme-crown{background:linear-gradient(120deg,#650f19,#e0b64f 48%,#6c1720);color:#281600}
+.rc-player-card.rc-theme-regalia,.rc-plate-sample.rc-theme-regalia{background:linear-gradient(120deg,#070707,#6b501e 35%,#111 65%,#ad8739)}
+.rc-profile-card-label,.rc-profile-section-head{display:flex;justify-content:space-between;align-items:center;gap:8px;margin:15px 0 6px;color:#e4cd8b;font:10px Georgia,serif;letter-spacing:.2em}
+.rc-profile-card-label small,.rc-profile-section-head small{font:10px system-ui,sans-serif;letter-spacing:0;color:#a99e88}
+.rc-profile-equipped{margin:0 0 17px;padding:9px 10px;background:#100d0d;border:1px solid #b89a5844;border-top:0}
+.rc-profile-equipped-title{display:flex;justify-content:space-between;color:#cdb36d;font:9px Georgia,serif;letter-spacing:.18em;margin-bottom:7px}
+.rc-profile-equipped-title span{font-family:system-ui,sans-serif;letter-spacing:0}
+.rc-profile-fragments{display:flex;gap:5px;flex-wrap:wrap}
+.rc-profile-frag{font-size:10px;padding:5px 7px;border:1px solid #92733b;background:#282014;color:#f0d99a}
+.rc-profile-frag i{font-style:normal;margin-right:4px}.rc-profile-frag.is-empty{border-style:dashed;background:#0003;color:#776d5c}
+.rc-plate-options{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:9px}
+.rc-plate-option{min-width:0;padding:8px;background:linear-gradient(150deg,#1d1715,#0b0909);border:1px solid #8e744b66}
+.rc-plate-sample{position:relative;display:flex;align-items:center;gap:8px;min-height:57px;padding:7px 8px;border:1px solid #d2b66d;box-shadow:inset 0 0 15px #0007;overflow:hidden}
+.rc-plate-sample:after{content:"♛";position:absolute;right:4px;bottom:-17px;font-size:60px;color:#ffffff17}
+.rc-plate-orbit{z-index:1;width:30px;height:30px;flex:0 0 30px;display:grid;place-items:center;border:1px solid #f5dfa3;border-radius:50%;color:#f5dfa3}
+.rc-plate-sample-name{position:relative;z-index:1;min-width:0;font-size:13px;font-weight:900;overflow-wrap:anywhere;text-shadow:0 1px 3px #000}
+.rc-plate-sample-rarity{position:absolute;top:4px;right:6px;font:8px Georgia,serif;letter-spacing:.12em;color:#fff0c0}
+.rc-plate-option-info{display:flex;flex-direction:column;gap:3px;margin:7px 1px;min-height:39px}.rc-plate-option-info b{font-size:11px;color:#f1dfb1}.rc-plate-option-info small{font-size:10px;line-height:1.4;color:#a99e88}
+.rc-plate-option>button{width:100%;margin:0;padding:7px 4px;font-size:10px}
+.rc-clear-row{text-align:right;margin:4px 0 10px}.rc-clear-row button{font-size:10px;padding:6px 9px}
+.rc-current-title{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:9px 10px;margin-bottom:7px;background:#17110f;border:1px solid #b89a5866}.rc-current-title>div{display:flex;flex-direction:column;gap:4px}.rc-current-title small{font-size:9px;color:#a99e88}.rc-current-title>span{font-size:11px;color:#a99e88}.rc-current-title button{margin:0;padding:6px 9px;font-size:10px}
+@media(max-width:390px){.rc-plate-options{grid-template-columns:1fr}.rc-player-card{min-height:154px;padding:12px}.rc-card-identity>strong{font-size:19px}.rc-card-crest{width:50px;height:50px;flex-basis:50px}}
 </style>`);
-
-/* HTML inline handlers用に操作関数を公開 */
-Object.assign(window,{colPull,colEquipCosmetic,colEquipFragment,colUnequipFragment,colExchange,colSkipReveal,colCloseReveal});
-
+// Build page styles and install when the existing game scripts have defined all their systems.
+document.head.insertAdjacentHTML('beforeend',`<style>
+#who .rc-who-name{display:inline-block}.rc-nameplate{display:inline-block;padding:3px 10px;border-radius:4px;border:1px solid #b89a58;color:#f9e6b1;font-weight:800;letter-spacing:.08em;text-shadow:0 1px 2px #000;box-shadow:inset 0 0 12px #0008,0 0 8px #0008}.rc-theme-default{background:linear-gradient(120deg,#24201a,#514127,#17120e)}.rc-theme-brass{background:linear-gradient(120deg,#30200b,#9d7730 45%,#3b290d)}.rc-theme-crest{background:linear-gradient(120deg,#17191c,#50565b,#161719)}.rc-theme-crimson{background:linear-gradient(120deg,#36070e,#9b1e2c,#2a070d);border-color:#d9a85b}.rc-theme-emerald{background:linear-gradient(120deg,#052b20,#0f7350,#082b22);border-color:#9cc9a8}.rc-theme-sapphire{background:linear-gradient(120deg,#081d46,#245b9b,#081b3c);border-color:#9bd2f7}.rc-theme-amethyst{background:linear-gradient(120deg,#251036,#78469b,#28113b);border-color:#d8b5ff}.rc-theme-imperial{background:linear-gradient(120deg,#4b3008,#e4bd59,#69450b);color:#231500;border-color:#fff0a5}.rc-theme-noir{background:linear-gradient(120deg,#050505,#343434,#080808);border-color:#e1c37d}.rc-theme-crown{background:linear-gradient(120deg,#650f19,#e0b64f,#6c1720);border:2px solid #ffe8a2;color:#2b1600}.rc-theme-regalia{background:linear-gradient(120deg,#070707,#6b501e 35%,#111,#ad8739);border:2px double #f4df9d}
+#collection,#profile{background:linear-gradient(155deg,#171012,#0b0809);border:1px solid #b89a5866;box-shadow:inset 0 0 40px #0008;padding:14px;max-width:620px;margin:10px auto}.rc-page-head{display:flex;align-items:center;justify-content:space-between;gap:8px;border-bottom:1px solid #b89a5855;padding-bottom:10px}.rc-page-head h2{margin:2px 0;color:#e3cf9a;font:400 20px Georgia,serif;letter-spacing:.16em}.rc-eyebrow{font:10px Georgia,serif;letter-spacing:.35em;color:#b89a58}.rc-wallet{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:10px 12px;margin:12px 0;background:linear-gradient(100deg,#20180f,#0c0a09);border:1px solid #b89a5866}.rc-wallet span{font-size:10px;letter-spacing:.12em;color:#bdab80}.rc-wallet b{font-size:20px;color:#f3d98d}.rc-tabs{display:flex;gap:5px;flex-wrap:wrap;margin:8px 0 14px}.rc-tabs button{flex:1;min-width:28%;padding:8px 5px;font-size:12px}.rc-tabs button.active{background:linear-gradient(#e8ce80,#a67d2d);color:#1b1000;border-color:#ffe6a2}.rc-gacha-hero{position:relative;overflow:hidden;text-align:center;padding:24px 12px 18px;border:1px solid #d2ae5d;background:radial-gradient(ellipse at 50% 32%,#56202a,#210b10 58%,#080607);box-shadow:inset 0 0 38px #000,0 0 20px #0009}.rc-hero-crown{font-size:44px;color:#e6ca7d;text-shadow:0 0 18px #f2d77e99}.rc-hero-small{font:10px Georgia,serif;letter-spacing:.34em;color:#c9a75b}.rc-gacha-hero h2{font:400 24px Georgia,serif;letter-spacing:.2em;color:#f1dc9e;margin:7px 0}.rc-gacha-hero p{font-size:12px;color:#d8cdb2;margin:6px 0 14px}.rc-hero-rates{display:flex;flex-wrap:wrap;justify-content:center;gap:7px}.rc-hero-rates span{border:1px solid #b89a5877;padding:4px 7px;font-size:11px;color:#e3cf9a;background:#0005}.rc-pull-actions{display:grid;grid-template-columns:1fr 1fr;gap:9px;margin:14px 0}.rc-pull-actions button{margin:0;min-height:66px;background:linear-gradient(160deg,#f1d88c,#9f7225);border:1px solid #f5e4ac;box-shadow:0 4px 0 #4c3512,0 8px 18px #0009}.rc-pull-actions button b{display:block;font:700 14px Georgia,serif;letter-spacing:.12em}.rc-pull-actions button small{display:block;font-size:12px;margin-top:4px}.rc-note{font-size:11px;line-height:1.7;color:#b9ad94;padding:9px 10px;background:#ffffff08;border-left:2px solid #aa8643;margin:10px 0}.rc-statline{display:flex;justify-content:space-between;gap:7px;flex-wrap:wrap;margin:12px 0;color:#dfc98d;font-size:12px}.rc-section-title{font:400 14px Georgia,serif;letter-spacing:.22em;color:#d7b96b;border-bottom:1px solid #b89a5844;padding-bottom:7px;margin:18px 0 10px}.rc-history-mini{display:flex;flex-wrap:wrap;gap:6px}.rc-history-mini span{font-size:11px;padding:5px 7px;border:1px solid #ffffff22;background:#0006}.rc-item{position:relative;text-align:center;padding:10px 8px;border:1px solid #777;background:linear-gradient(145deg,#222,#0d0d0d);min-width:0;box-shadow:0 5px 14px #0008}.rc-item-top{display:flex;justify-content:space-between;align-items:center;font:10px Georgia,serif;letter-spacing:.12em}.rc-item-icon{font-size:27px;color:#e3cf9a;margin:6px}.rc-item-name{font-weight:800;font-size:13px;line-height:1.4}.rc-item-desc{font-size:10px;line-height:1.5;color:#c4baa5;margin-top:5px}.rc-r-n{border-color:#777;background:linear-gradient(145deg,#292a2d,#101113)}.rc-r-r{border-color:#4d9c75;background:linear-gradient(145deg,#123a2c,#0b1511)}.rc-r-sr{border-color:#579bd7;background:linear-gradient(145deg,#132c4d,#0b111c)}.rc-r-ssr{border-color:#a277c8;background:linear-gradient(145deg,#381e4b,#110b19)}.rc-r-ur{border-color:#e1be59;background:linear-gradient(145deg,#63371c,#21100b);box-shadow:0 0 14px #d7a84b44,inset 0 0 16px #f2d07922}.rc-r-n .rc-item-top b{color:#c5c5c5}.rc-r-r .rc-item-top b{color:#79d6a0}.rc-r-sr .rc-item-top b{color:#8fcaff}.rc-r-ssr .rc-item-top b{color:#d2a4ff}.rc-r-ur .rc-item-top b{color:#ffdc78}.rc-owned-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}.rc-owned-cell{min-width:0}.rc-equip-btn{width:100%;margin:0 0 12px;padding:8px;font-size:12px}.rc-equip-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:7px}.rc-slot{display:flex;flex-direction:column;gap:6px;min-height:105px;padding:9px 6px;border:1px solid #b89a5877;background:linear-gradient(150deg,#20180f,#090808);text-align:center}.rc-slot small{font:9px Georgia,serif;letter-spacing:.1em;color:#cdb36d}.rc-slot b{font-size:12px}.rc-slot span{font-size:10px;line-height:1.45;color:#c4b99f;flex:1}.rc-slot button{padding:5px;font-size:11px;margin:0}.rc-empty{color:#756b59}.rc-empty-note{padding:16px;text-align:center;font-size:12px;color:#b8ad99;border:1px dashed #b89a5866}.rc-equipped-plate{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:12px;background:#1c1710;border:1px solid #b89a5855}.rc-equipped-plate small{font:10px Georgia,serif;letter-spacing:.2em;color:#c9b16f}.rc-history-list>div{display:grid;grid-template-columns:42px 1fr;gap:5px;padding:9px 4px;border-bottom:1px solid #ffffff1a}.rc-history-list>div>span{font-size:11px}.rc-history-list small{grid-column:2;color:#a99e88;font-size:10px}.rc-profile-preview{padding:20px 10px;margin:14px 0;text-align:center;background:radial-gradient(ellipse at 50% 20%,#51212a,#12080b 70%);border:1px solid #b89a5877;box-shadow:inset 0 0 35px #000}.rc-preview-name{margin:8px auto;font-size:20px}.rc-profile-preview small{font:9px Georgia,serif;letter-spacing:.25em;color:#b9a477}.rc-title-list{max-height:340px;overflow:auto;border:1px solid #b89a5833;padding:5px 8px}.rc-title-row{display:flex;justify-content:space-between;align-items:center;gap:8px;padding:7px 2px;border-bottom:1px solid #ffffff16}.rc-title-row>div{min-width:0;display:flex;flex-direction:column;gap:4px}.rc-title-row small{font-size:10px;color:#a99e88}.rc-title-row button{margin:0;padding:6px 10px;font-size:11px;white-space:nowrap}.rc-active-label{font-size:11px;color:#e3cf9a;white-space:nowrap}.rc-profile-actions{display:flex;gap:7px;flex-wrap:wrap;margin-top:14px}.rc-profile-actions button{flex:1;font-size:12px}.rc-profile-plate-head{padding:10px!important;border:1px solid #b89a5877;background:#110b0d}.rc-profile-plate-head b{padding:4px 10px;border-radius:4px}.rc-r-n:not(.rc-revealed){color:#d4d4d4}.rc-reveal{position:fixed;inset:0;z-index:10000;display:flex;align-items:center;justify-content:center;background:radial-gradient(ellipse at center,#39181b 0,#080506 75%);overflow:auto;padding:18px}.rc-curtain{position:fixed;top:0;bottom:0;width:52%;z-index:0;background:repeating-linear-gradient(90deg,#2a060b 0 12px,#520f19 12px 25px,#25050a 25px 37px);box-shadow:inset 0 0 35px #000,0 0 25px #000}.rc-left{left:0;border-right:3px solid #b89a58;transform:translateX(0);transition:transform 1s cubic-bezier(.2,.8,.2,1)}.rc-right{right:0;border-left:3px solid #b89a58;transform:translateX(0);transition:transform 1s cubic-bezier(.2,.8,.2,1)}#rc-reveal.rc-open .rc-left{transform:translateX(-105%)}#rc-reveal.rc-open .rc-right{transform:translateX(105%)}.rc-reveal-inner{position:relative;z-index:2;width:min(100%,540px);text-align:center;padding:18px;background:linear-gradient(145deg,#17100d,#080707);border:1px solid #d8b25a;box-shadow:0 0 0 5px #27170e,0 0 35px #e4c36b33;opacity:0;transform:scale(.94);animation:rcEnter .5s .6s forwards}@keyframes rcEnter{to{opacity:1;transform:scale(1)}}.rc-reveal-kicker{font:9px Georgia,serif;letter-spacing:.35em;color:#b89a58}.rc-reveal-title{font:400 22px Georgia,serif;letter-spacing:.2em;color:#f0d99a;margin:7px 0}.rc-seal{margin:10px auto;width:90px;height:90px;border:3px double #d8b25a;border-radius:50%;display:grid;place-items:center;font-size:46px;color:#e8d18b;box-shadow:0 0 22px #d8b25a44,inset 0 0 20px #d8b25a22;transition:transform .9s,opacity .9s}.rc-seal-open{transform:rotate(180deg) scale(1.5);opacity:0}.rc-reveal-sub{font:10px Georgia,serif;letter-spacing:.28em;color:#ae8b4b;margin:10px}.rc-reveal-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(125px,1fr));gap:8px;max-height:48vh;overflow:auto;margin:12px 0}.rc-revealed{padding:10px 6px;background:#100d0d;border:1px solid #77623c;opacity:0;transform:translateY(16px) scale(.94)}.rc-revealed.rc-card-in{animation:rcCardIn .42s forwards}@keyframes rcCardIn{to{opacity:1;transform:none}}.rc-revealed-rarity{font:10px Georgia,serif;letter-spacing:.2em;color:#e7cf8e}.rc-revealed-icon{font-size:28px;color:#e4c779;margin:5px}.rc-revealed b{display:block;font-size:12px}.rc-revealed small{display:block;color:#b9ab8f;font-size:10px;margin:4px}.rc-revealed em{display:block;font-style:normal;font-size:10px;color:#e5d199;margin-top:5px}.rc-skip{background:linear-gradient(#e6c76e,#a8812f);padding:8px 22px}.rc-nameplate{max-width:100%;overflow-wrap:anywhere}
+@media(max-width:390px){.rc-equip-grid{grid-template-columns:1fr}.rc-pull-actions button{min-height:60px}.rc-owned-grid{gap:6px}.rc-item{padding:8px 5px}.rc-item-name{font-size:12px}.rc-page-head h2{font-size:17px}.rc-wallet{flex-wrap:wrap}.rc-reveal-title{font-size:18px}}
+</style>`);
+// Patch delete path in the existing owner action at source level is safer than wrapping its internals;
+// install the page and hooks once all base globals are available.
+rcInstall();
 })();
 
-</script>
-</body></html>
+</script></body></html>
